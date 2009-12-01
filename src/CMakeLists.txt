@@ -1,0 +1,5 @@
+include_directories(../include)
+add_definitions(-O2 `pkg-config --cflags gstreamer-0.10 taglib`)
+link_libraries(pthread gstreamer-0.10 gobject-2.0 gmodule-2.0 gthread-2.0 rt xml2 glib-2.0 tag ncurses menu panel)
+add_executable(../ncrok ncrok.cpp output.cpp playlist.cpp tune.cpp	util.cpp window.cpp)
+INSTALL_TARGETS(/bin ../ncrok)
