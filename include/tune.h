@@ -23,7 +23,7 @@
 #include <menu.h>
 #include <string>
 #include <regex.h>
-
+#include <stdint.h>
 #define TUNE_LEN_FNAME	512
 #define TUNE_LEN_TITLE	96
 #define TUNE_LEN_ALBUM	96

@@ -1,1 +1,1 @@
-g++ -O2 `pkg-config --cflags gstreamer-0.10 taglib` `pkg-config --libs gstreamer-0.10 taglib` -lncurses -lmenu -lpanel *.cpp -o ncrok
+g++ -I include -O2 `pkg-config --cflags gstreamer-0.10 taglib` `pkg-config --libs gstreamer-0.10 taglib` -lncurses -lmenu -lpanel src/*.cpp -o ncrok
