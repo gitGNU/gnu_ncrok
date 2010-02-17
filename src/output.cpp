@@ -34,7 +34,6 @@ static GMainLoop *loop;
 GstBus *bus;
 GstElement *pipeline;
 char out_state;
-char lenstr[16], posstr[16];
 Ncrok *ncrok;
 gint64 len;
 int failupdates;
@@ -134,10 +133,10 @@ bool out_play_pause(){
 
 void out_get_length(){
 	GstFormat fmt = GST_FORMAT_TIME;
-	if(gst_element_query_duration (pipeline, &fmt, &len)){
-		g_snprintf(lenstr,16,OUT_TIME_FMT, GST_TIME_ARGS(len));
-		ncrok->setLength(lenstr);
-	}
+	while(!gst_element_query_duration (pipeline, &fmt, &len)){}
+	char *lenstr = (char*)malloc(16);
+	g_snprintf(lenstr,16,OUT_TIME_FMT, GST_TIME_ARGS(len));
+	ncrok->setLength(lenstr);
 }
 
 static bool update_time(){
@@ -155,6 +154,8 @@ static bool update_time(){
 	bool go_to_next = false;
 	
 	if (gst_element_query_position (pipeline, &fmt, &pos)) {
+		char *posstr;
+		posstr = (char*)malloc(16);
 		g_snprintf(posstr,16,OUT_TIME_FMT, GST_TIME_ARGS(pos));
 		double rel = (double)pos / (double)len;
 		ncrok->updateTime(posstr, rel);
