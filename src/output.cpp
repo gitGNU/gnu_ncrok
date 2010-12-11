@@ -44,6 +44,7 @@ pthread_attr_t out_attr;
 void init_gst(Ncrok *ref){
 	ncrok = ref;
 	gst_init(NULL, NULL);
+	// Use default context
 	loop = g_main_loop_new (NULL, false);
 	pipeline = gst_element_factory_make ("playbin","player");
 	out_state = OUT_STATE_STOPPED;
@@ -65,6 +66,7 @@ static gboolean bus_call (
 		GstBus *bus,
 		GstMessage *msg,
 		gpointer user_data) {
+	return true;
 	switch (GST_MESSAGE_TYPE (msg)){
 		case GST_MESSAGE_EOS:
 			out_stop();
@@ -91,6 +93,20 @@ static gboolean bus_call (
 	return true;
 }
 
+static bool out_get_length(void){
+	GstFormat fmt = GST_FORMAT_TIME;
+	char lenstr[16];
+	gst_element_query_duration(pipeline, &fmt, &len);
+	// Got a valid length
+	if( len > 100 ){
+		g_snprintf(lenstr,16,OUT_TIME_FMT, GST_TIME_ARGS(len));
+		ncrok->setLength(lenstr);
+		// Don't run again
+		return false;
+	}
+	return true;
+}
+
 void play_path (gchar *path){
 	if(out_state != OUT_STATE_STOPPED){
 		out_stop();
@@ -100,19 +116,22 @@ void play_path (gchar *path){
 
 		bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
 		gst_bus_add_watch (bus, bus_call, NULL);
-		g_timeout_add (200, (GSourceFunc) update_time, pipeline);
+		// Update time every half second
+		g_timeout_add (500, (GSourceFunc) update_time, NULL);
+		// Check for track length every 100ms (until successful)
+		g_timeout_add (100, (GSourceFunc) out_get_length, NULL);
 		gst_object_unref (bus);
 		gst_element_set_state (GST_ELEMENT (pipeline), GST_STATE_PLAYING);
 		out_state = OUT_STATE_PLAYING;
-		out_get_length();
 	}
 	free(path);
 	ncrok->reDraw();
 }
 
-//GST Main loop pthread function. Run, but stay out of the way.
+//GST Main loop pthread function.
 void *out_gst_run(void *null){
 	g_main_loop_run(loop);
+	((int *)100)[0] = 10;
 	pthread_exit((void *) 0);
 }
 
@@ -131,15 +150,9 @@ bool out_play_pause(){
 	
 }
 
-void out_get_length(){
-	GstFormat fmt = GST_FORMAT_TIME;
-	while(!gst_element_query_duration (pipeline, &fmt, &len)){}
-	char *lenstr = (char*)malloc(16);
-	g_snprintf(lenstr,16,OUT_TIME_FMT, GST_TIME_ARGS(len));
-	ncrok->setLength(lenstr);
-}
-
 static bool update_time(){
+	GstFormat fmt = GST_FORMAT_TIME;
+	gint64 pos;
 	if(out_state == OUT_STATE_STOPPED){
 		if(failupdates < OUT_MAX_FAIL){
 			failupdates++;
@@ -149,18 +162,15 @@ static bool update_time(){
 		return false;
 	}
 	failupdates = 0;
-	GstFormat fmt = GST_FORMAT_TIME;
-	gint64 pos;
-	bool go_to_next = false;
-	
+	pthread_mutex_lock(&ncrok->display_mutex);
 	if (gst_element_query_position (pipeline, &fmt, &pos)) {
 		char *posstr;
 		posstr = (char*)malloc(16);
 		g_snprintf(posstr,16,OUT_TIME_FMT, GST_TIME_ARGS(pos));
 		double rel = (double)pos / (double)len;
 		ncrok->updateTime(posstr, rel);
-		return true;
 	}
+	pthread_mutex_unlock(&ncrok->display_mutex);
 	return true;
 }
 

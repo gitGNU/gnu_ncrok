@@ -48,7 +48,7 @@ bool out_play_pause();
 void out_seek_fine(bool dir);
 void out_seek_coarse(bool dir);
 void out_stop();
-void out_get_length();
+static bool out_get_length();
 void *out_gst_run(void *null);
 
 #endif

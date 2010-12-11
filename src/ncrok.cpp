@@ -43,7 +43,7 @@
 #include "playlist.h"
 #include "window.h"
 
-Ncrok app;
+static Ncrok app;
 static void resizeWin(int ignore);
 
 /*
@@ -78,22 +78,25 @@ Ncrok::~Ncrok(){
 int Ncrok::initialize(int tracks){
 	(void) signal(SIGWINCH, resizeWin);
 	initscr();
+	char title[16];
 
-	raw();
+	//raw();
 	noecho();
+	cbreak();
 	keypad(stdscr, true);
 	curs_set(0);
 	
+	pthread_mutex_init(&display_mutex, NULL);
+
 	initWindows();
 
 	//box(stdscr,0,0);
 	update_panels();
 
 	doupdate();
-	char *title = (char*)malloc(16);
 	sprintf(title, "%d Tracks",tracks);
 	right.printTitle(title);
-	free(title);
+	
 	init_gst(this);
 	bottom.printTitle(TITLE_STRING);
 	return 0;
@@ -131,6 +134,7 @@ void Ncrok::runPlaylist(){
 	right.refresh();
 
 	while((ch = wgetch(right.getWindow())) != IN_QUIT){
+		pthread_mutex_lock(&display_mutex);
 		switch(ch){
 			case IN_SAVE:
 				sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
@@ -261,6 +265,8 @@ void Ncrok::runPlaylist(){
 				//bottom.printCentered(longtmp,1);
 				break;
 		}
+		right.refresh();
+		pthread_mutex_unlock(&display_mutex);
 	}
 }
 
@@ -307,7 +313,9 @@ void Ncrok::addDir(){
 	int count;
 	sprintf(out,"Open:");
 	right.printCentered(out, right.getHeight() - 1);
+	pthread_mutex_unlock(&display_mutex);
 	while((ch = wgetch(right.getWindow())) != IN_ESC){
+		pthread_mutex_lock(&display_mutex);
 		right.reBox();
 		right.refresh();
 		switch(ch){
@@ -344,6 +352,8 @@ void Ncrok::addDir(){
 		sprintf(out, "Open: %s",qstring);
 		right.printCentered(out,right.getHeight() - 1);
 		doupdate();
+		// Unlock only if looping
+		pthread_mutex_unlock(&display_mutex);
 	}
 	right.reBox();
 }
@@ -373,7 +383,10 @@ void Ncrok::findByFirst(){
 	bool get_out = false;
 	sprintf(out,"Jump:");
 	right.printCentered(out, right.getHeight() - 1);
+	pthread_mutex_unlock(&display_mutex);
+
 	while((ch = wgetch(right.getWindow())) != IN_ESC && !get_out){
+		pthread_mutex_lock(&display_mutex);
 		right.reBox();
 		right.refresh();
 		switch(ch){
@@ -410,6 +423,7 @@ void Ncrok::findByFirst(){
 			}
 		}
 		doupdate();
+		pthread_mutex_unlock(&display_mutex);
 	}
 	right.reBox();
 }
@@ -427,7 +441,9 @@ void Ncrok::search(){
 	//debug output
 	char test[10];
 	right.printCentered(out, right.getHeight() - 1);
+	pthread_mutex_unlock(&display_mutex);
 	while((ch = wgetch(right.getWindow())) != IN_ESC){
+		pthread_mutex_lock(&display_mutex);
 		search_again = true;
 		right.reBox();
 		right.refresh();
@@ -486,6 +502,7 @@ void Ncrok::search(){
 			}
 		}
 		doupdate();
+		pthread_mutex_unlock(&display_mutex);
 	}
 	right.reBox();
 	playlist.clearSearch();
@@ -528,17 +545,15 @@ void Ncrok::updateQueueLabels(){
 }
 
 void Ncrok::updateTime(char* pos, double rel){
-	char* buf = (char*)malloc(32);
+	char buf[64];
 	sprintf(buf,"%s / %s",pos, length);
 	bottom.printCentered(buf,3);
+	//bottom.printCentered("Tuna",3);
 	drawProgress(rel);
-	free(pos);
-	free(buf);
 }
 
 void Ncrok::setLength(char *len){
 	strcpy(length, len);
-	free(len);
 }
 
 void Ncrok::nextTrack(){
@@ -559,6 +574,8 @@ void Ncrok::prevTrack(){
 	}
 }
 
+
+//This function is called by another thread!
 void Ncrok::drawProgress(double progress){
 	char stat = (char)(progress * 64);
 	char str[67];

@@ -25,6 +25,7 @@
 #include "playlist.h"
 #include <ncurses.h>
 #include <form.h>
+#include <pthread.h>
 
 #define IN_UP		(char)KEY_UP
 #define IN_DOWN		(char)KEY_DOWN
@@ -60,7 +61,7 @@
 #define IN_LOAD		'l'
 #define IN_JUMP		'j'
 
-#define TITLE_STRING	"Welcome to Ncrok 0.40! This is the future!"
+#define TITLE_STRING	"Welcome to Ncrok 0.50! This is the future!"
 
 class Ncrok {
 	public:
@@ -79,6 +80,8 @@ class Ncrok {
 		Window left;
 		Window right;
 		Window bottom;
+
+		pthread_mutex_t display_mutex;
 
 	protected:
 		void playSelected();
