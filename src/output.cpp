@@ -66,7 +66,6 @@ static gboolean bus_call (
 		GstBus *bus,
 		GstMessage *msg,
 		gpointer user_data) {
-	return true;
 	switch (GST_MESSAGE_TYPE (msg)){
 		case GST_MESSAGE_EOS:
 			out_stop();
