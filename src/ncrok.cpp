@@ -493,6 +493,7 @@ void Ncrok::search(){
 		right.printCentered(out,right.getHeight() - 1);
 		if(!search_again){
 			doupdate();
+			pthread_mutex_unlock(&display_mutex);
 			continue;
 		}
 		if(len > 0){
