@@ -67,7 +67,7 @@ void Tune::genDisplay(){
 		}
 		else {
 			memcpy((void*)displayName,&filename[i + 1], min(TUNE_LEN_DISP - 1, TUNE_LEN_FNAME - (i + 1)) );
-			displayName[min(TUNE_LEN_DISP - 1, TUNE_LEN_FNAME - (i + 1))] = NULL;
+			displayName[min(TUNE_LEN_DISP - 1, TUNE_LEN_FNAME - (i + 1))] = 0;
 		};
 	}
 }
@@ -120,9 +120,9 @@ ITEM *Tune::getItem(){
 		strcpy(item_text + 3, displayName);
 	}
 	if(stopafter) item_text[2] = '*';
-	item_text[TUNE_LEN_ITEM - 1] = NULL;
+	item_text[TUNE_LEN_ITEM - 1] = 0;
 
-	return new_item(item_text,(char *)NULL);
+	return new_item(item_text,NULL);
 }
 
 void Tune::updateItem(ITEM *item){

@@ -261,7 +261,7 @@ int Playlist::search(char *str){
 			if(count + 1 == MAX_SEARCH_TERMS) break;
 			search_term[count] = (char*)malloc((i - start) + 1);
 			memcpy(search_term[count], &str[start], i - start);
-			search_term[count][i - start] = NULL; //terminate
+			search_term[count][i - start] = 0; //terminate
 			search_exprs[count] = (regex_t *)malloc(sizeof(regex_t));
 			if(regcomp(search_exprs[count], search_term[count], REG_ICASE) != 0){
 				//if regex doesnt compile, just skip this one

@@ -324,7 +324,7 @@ void Ncrok::addDir(){
 			case IN_DELETE2:
 			case IN_BACKSPACE:
 				if(len > 0){
-					qstring[--len] = NULL;
+					qstring[--len] = 0;
 				}
 				else get_out = true;
 				break;
@@ -343,7 +343,7 @@ void Ncrok::addDir(){
 				if(ch >= 32 && ch <= 126){
 					if(len < 72){
 						qstring[len] = ch;
-						qstring[++len] = NULL;
+						qstring[++len] = 0;
 					}
 					break;
 				} get_out = true;
@@ -395,7 +395,7 @@ void Ncrok::findByFirst(){
 			case IN_DELETE2:
 			case IN_BACKSPACE:
 				if(len > 0){
-					qstring[--len] = NULL;
+					qstring[--len] = 0;
 				}
 				else get_out = true;
 				break;
@@ -408,7 +408,7 @@ void Ncrok::findByFirst(){
 				if(ch >= 32 && ch <= 126){
 					if(len < 32){
 						qstring[len] = ch;
-						qstring[++len] = NULL;
+						qstring[++len] = 0;
 					}
 					break;
 				} get_out = true;
@@ -483,7 +483,7 @@ void Ncrok::search(){
 				if(ch >= 32 && ch <= 126){ //letter...
 					if(len < 32){ //Just do nothing in this case
 						qstring[len] = ch;
-						qstring[++len] = NULL;
+						qstring[++len] = 0;
 					}
 				}
 				else get_out = true;

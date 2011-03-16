@@ -31,7 +31,7 @@ Window::Window(int xx, int yy, int ww, int hh){
 }
 
 Window::Window(){
-	title[0] = NULL;
+	title[0] = 0;
 }
 
 Window::~Window(){
