@@ -129,8 +129,10 @@ void play_path (gchar *path){
 
 //GST Main loop pthread function.
 void *out_gst_run(void *null){
-	g_main_loop_run(loop);
-	((int *)100)[0] = 10;
+	while(1){
+		g_main_loop_run(loop);
+		pthread_testcancel();
+	}
 	pthread_exit((void *) 0);
 }
 

@@ -147,7 +147,7 @@ int Playlist::readDir(const char* path){
 			else if(strlen(dit->d_name) > 5){
 				ext = (char*)((uint64_t)dit->d_name + 
 					(uint64_t)(strlen(dit->d_name)-4));
-				if(strcmp(ext,".mp3")==0 || strcmp(ext,".ogg")==0){
+				if(strcmp(ext,".mp3")==0 || strcmp(ext,".ogg")==0 || strcmp(ext,".m4a")==0){
 					addTrack(tmpname);
 					//printw("%u\n", list[list.size()-1]);
 					//printw("%s\n", activeTrack()->getAlbum());

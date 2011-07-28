@@ -61,7 +61,7 @@
 #define IN_LOAD		'l'
 #define IN_JUMP		'j'
 
-#define TITLE_STRING	"Welcome to Ncrok 0.53! This is the future!"
+#define TITLE_STRING	"Welcome to Ncrok 0.54! This is the future!"
 
 class Ncrok {
 	public:
