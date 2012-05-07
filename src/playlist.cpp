@@ -21,7 +21,7 @@
 #include "playlist.h"
 #include "tune.h"
 #include "util.h"
-#include <vector>
+#include <deque>
 #include <cstdlib>
 #include <cstring>
 #include <stdio.h>
@@ -30,6 +30,7 @@
 #include <ncurses.h>
 #include <algorithm>
 #include <regex.h>
+#include <string>
 
 
 Playlist::Playlist(){
@@ -54,12 +55,11 @@ Playlist::~Playlist(){
 }
 
 Tune *Playlist::operator[](const int index){
-	return list[index];
+	return &list[index];
 }
 
 bool Playlist::addTrack(char *filename){
-	Tune* tmp = new Tune(filename);
-	list.push_back(tmp);
+	list.push_back(Tune(filename));
 	//printw("%s\n",list[list.size()-1]->getTitle());
 	//currIndex = list.size() - 1;
 	return 1;
@@ -74,37 +74,39 @@ Tune *Playlist::nextTrack(){
 		//clear stopafter flag
 		prevstopafter = currIndex;
 		stopafter = -1;
-		list[currIndex]->stopafter = 0;
+		list[currIndex].stopafter = 0;
 		return NULL;
 	}
 	if(play_queue.size() > 0){
 		currIndex = play_queue[0];
 		play_queue.erase(play_queue.begin());
-		list[currIndex]->queue_index = -1;
+		list[currIndex].queue_index = -1;
 		dequeued = currIndex;
 		decrementQueue(0);
-		return list[currIndex];
+		return &list[currIndex];
 	}
 	if(currIndex == list.size() - 1)
 		currIndex = 0; //then increment
-	return list[++currIndex];
+	return &list[++currIndex];
 }
 
 Tune *Playlist::prevTrack(){
-	if(currIndex == 0) return list[currIndex];
-	return list[--currIndex];
+	if(currIndex == 0) return &list[currIndex];
+	return &list[--currIndex];
 }
 
 Tune *Playlist::activeTrack(){
-	return list[currIndex];
+	return &list[currIndex];
 }
 
 MENU *Playlist::getMenu(){
 	ITEM **items = (ITEM**)calloc(list.size()+1, sizeof(ITEM*));
 	char *tmp;
-	for(int i = 0; i < list.size(); i++){
-		items[i] = list[i]->getItem();
-		set_item_userptr(items[i], (void*)i);
+	uint32_t count = 0;
+	for(std::deque<Tune>::iterator iter = list.begin(); iter != list.end(); iter++){
+		items[count] = (*iter).getItem();
+		(*iter).index = count;
+		set_item_userptr(items[count++], &(*iter));
 	}
 	items[list.size()] = NULL;
 	playmenu = new_menu(items);
@@ -145,7 +147,7 @@ int Playlist::readDir(const char* path){
 				count += subcount;
 			}
 			else if(strlen(dit->d_name) > 5){
-				ext = (char*)((uint64_t)dit->d_name + 
+				ext = (char*)((uint64_t)dit->d_name +
 					(uint64_t)(strlen(dit->d_name)-4));
 				if(strcmp(ext,".mp3")==0 || strcmp(ext,".ogg")==0){
 					addTrack(tmpname);
@@ -166,6 +168,11 @@ void Playlist::play(int index){
 	activeTrack()->play();
 }
 
+void Playlist::play(Tune &tune){
+	currIndex = tune.index;
+	tune.play();
+}
+
 void Playlist::play(){
 	activeTrack()->play();
 }
@@ -175,27 +182,48 @@ void Playlist::play(){
  */
 void Playlist::queue(int index){
 	play_queue.push_back(index);
-	list[index]->queue_index = play_queue.size()-1;
+	list[index].queue_index = play_queue.size()-1;
+}
+
+void Playlist::queue(Tune &tune){
+	play_queue.push_back(tune.index);
+	tune.queue_index = play_queue.size()-1;
 }
 
 /*
  * returns true if index found
  */
 bool Playlist::dequeue(int index){
-	int pos = list[index]->queue_index;
+	int pos = list[index].queue_index;
 	if(pos < 0) return false;
-	list[index]->queue_index = -1;
+	list[index].queue_index = -1;
 	play_queue.erase(play_queue.begin() + pos);
 	dequeued = index;
 	decrementQueue(pos);
 }
 
+bool Playlist::dequeue(Tune &tune){
+	int pos = tune.queue_index;
+	if(pos < 0) return false;
+	play_queue.erase(play_queue.begin() + pos);
+	dequeued = tune.index;
+	decrementQueue(pos);
+}
+
 void Playlist::toggleQueue(int index){
-	if(list[index]->queue_index == -1){
+	if(list[index].queue_index == -1){
 		queue(index);
 	}
 	else{
 		dequeue(index);
+	}
+}
+
+void Playlist::toggleQueue(Tune &tune){
+	if(tune.queue_index == -1){
+		queue(tune);
+	} else {
+		dequeue(tune);
 	}
 }
 
@@ -205,7 +233,7 @@ int Playlist::queueSize(){
 
 int *Playlist::getQueue(){
 	int *ret = (int *)calloc(queueSize(),sizeof(int));
-	std::vector<uint32_t>::iterator queue_iter;
+	std::deque<uint32_t>::iterator queue_iter;
 	queue_iter = play_queue.begin();
 	int i = 0;
 	while(queue_iter != play_queue.end()){
@@ -218,7 +246,7 @@ int *Playlist::getQueue(){
 void Playlist::decrementQueue(int start){
 	int size = play_queue.size();
 	for(int i = start; i < size; i++){
-		list[play_queue[i]]->queue_index--;
+		list[play_queue[i]].queue_index--;
 	}
 }
 
@@ -229,19 +257,32 @@ void Playlist::stopAfter(int index){
 	prevstopafter = stopafter;
 	if(stopafter == index){
 		stopafter = -1;
-		list[index]->stopafter = 0;
+		list[index].stopafter = 0;
 		return;
 	}
 	if(prevstopafter != -1)
-		list[prevstopafter]->stopafter = 0;
+		list[prevstopafter].stopafter = 0;
 	stopafter = index;
-	list[index]->stopafter = 1;
+	list[index].stopafter = 1;
+}
+
+void Playlist::stopAfter(Tune &tune){
+	prevstopafter = stopafter;
+	if(stopafter == tune.index){
+		stopafter = -1;
+		tune.stopafter = false;
+		return;
+	}
+	if(prevstopafter != -1)
+		list[prevstopafter].stopafter = false;
+	stopafter = tune.index;
+	tune.stopafter = true;
 }
 
 int Playlist::getFirst(char *str){
 	int i;
 	for(i = 0; i < list.size(); i++){
-		if(list[i]->startsWith(str)) return i;
+		if(list[i].startsWith(str)) return i;
 	}
 	return -1;
 }
@@ -277,13 +318,13 @@ int Playlist::search(char *str){
 	//NULL terminate the arrays
 	search_exprs[count] = NULL;
 	search_term[count] = NULL;
-	
+
 	max = size();
 	if(search_results.size() > 0) i = search_results.front();
 	else i = 0;
 	clearSearch();
 	for(; i < max; i++){
-		if(list[i]->query(search_exprs)){
+		if(list[i].query(search_exprs)){
 			search_results.push_back(i);
 			search_index = 0;
 			return i;
@@ -299,7 +340,7 @@ int Playlist::nextResult(){
 	int max = size();
 	int i;
 	for(i = search_results.back() + 1; i < max; i++){
-		if(list[i]->query(search_exprs)){
+		if(list[i].query(search_exprs)){
 			search_results.push_back(i);
 			++search_index;
 			return i;
@@ -335,13 +376,20 @@ void Playlist::clearQueue(){
 }
 
 void Playlist::remove(int index){
-	if(list[index]->queue_index >= 0)
+	if(list[index].queue_index >= 0)
 		toggleQueue(index);
-	if(list[index]->stopafter)
+	if(list[index].stopafter)
 		stopAfter(index);
-	free(list[index]);
 	list.erase(list.begin() + index);
 	correctList(index, -1);
+}
+
+void Playlist::remove(Tune &tune){
+	if(tune.queue_index >= 0)
+		toggleQueue(tune);
+	if(tune.stopafter)
+		stopAfter(tune);
+	list.erase(list.begin() + tune.index);
 }
 
 void Playlist::correctList(int start, int change){
@@ -360,47 +408,45 @@ void Playlist::sort(){
 		std::sort(list.begin(),list.end(),&tune_compare);
 }
 
-int Playlist::load(char *filename){
+int Playlist::load(const std::string &filename){
 	FILE *fp;
-	int count;
-	if((fp = fopen(filename, "r")) == NULL) return -1;
+	uint32_t count;
+	if((fp = fopen(filename.c_str(), "r")) == NULL) return -1;
 	//Read number of records
 	fseek(fp, 0, SEEK_SET);
-	if(fread(&count, sizeof(int), 1, fp) < 1)
+	if(fread(&count, sizeof(count), 1, fp) < 1)
 		return -1;
-	
+
 	struct tune_block block;
-	Tune* tmptune;
 	int i;
+
 	for(i = 0; i < count; i++){
 		if(fread(&block, sizeof(struct tune_block), 1, fp) < 1)
 			return -1;
-		tmptune = new Tune(&block);
-		list.push_back(tmptune);
+		list.push_back(Tune(&block));
 	}
 	fclose(fp);
 	return i;
 }
 
-int Playlist::save(char *filename){
+int Playlist::save(const std::string &filename){
 	FILE *fp;
-	if((fp = fopen(filename, "w")) == NULL) return -1;
+	struct tune_block block;
+	if((fp = fopen(filename.c_str(), "w")) == NULL) return -1;
 	fseek(fp, sizeof(int), SEEK_SET);
 	int max = list.size();
-	struct tune_block *block;
-	int count = 0;
+	uint32_t count = 0;
 	int i;
 	for(i = 0; i < max; i++){
-		if((block = list[i]->getBlock()) == NULL) return -1;
-		if(fwrite(block, sizeof(struct tune_block), 1, fp) > 0){
+		list[i].getBlock(block);
+		if(fwrite(&block, sizeof(block), 1, fp) > 0){
 			count++;
 		}
 		// Reset file pointer to the last valid write
-		else fseek(fp, sizeof(struct tune_block) * count, SEEK_SET);
-		free(block);
+		else fseek(fp, sizeof(block) * count, SEEK_SET);
 	}
 	fseek(fp, 0, SEEK_SET);
-	if(fwrite(&count, sizeof(int), 1, fp) < 1)
+	if(fwrite(&count, sizeof(count), 1, fp) < 1)
 		return -1; // did not save item count
 	fclose(fp);
 	return count;

@@ -98,7 +98,7 @@ static bool out_get_length(void){
 	gst_element_query_duration(pipeline, &fmt, &len);
 	// Got a valid length
 	if( len > 100 ){
-		g_snprintf(lenstr,16,OUT_TIME_FMT, GST_TIME_ARGS(len));
+		g_snprintf(lenstr, 16, OUT_TIME_FMT, GST_TIME_ARGS(len));
 		ncrok->setLength(lenstr);
 		// Don't run again
 		return false;
@@ -135,7 +135,7 @@ void *out_gst_run(void *null){
 }
 
 //Returns true on play
-bool out_play_pause(){	
+bool out_play_pause(){
 	switch(out_state){
 		case OUT_STATE_PAUSED:
 			gst_element_set_state(GST_ELEMENT (pipeline), GST_STATE_PLAYING);
@@ -146,7 +146,7 @@ bool out_play_pause(){
 			out_state = OUT_STATE_PAUSED;
 			return false;
 	}
-	
+
 }
 
 static bool update_time(){
@@ -198,17 +198,17 @@ void out_seek_rel(int64_t micros){
 	if(out_state != OUT_STATE_PLAYING && out_state != OUT_STATE_PAUSED) return;
 	GstFormat fmt = GST_FORMAT_TIME;
 	gint64 pos, len, newtime;
-	
+
 	if (gst_element_query_position (pipeline, &fmt, &pos)
 		&& gst_element_query_duration (pipeline, &fmt, &len)){
-		
+
 		newtime = pos + (GST_MSECOND * micros);
 		if(newtime < 0) newtime = 0;
 		if(newtime > len){
 			ncrok->nextTrack();
 			return;
 		}
-		
+
 		gst_element_seek_simple(pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, newtime);
 	}
 }

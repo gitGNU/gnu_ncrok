@@ -79,32 +79,30 @@ Tune::Tune(struct tune_block *block){
 	memcpy((void *)title, (void *)block->title, TUNE_LEN_TITLE);
 	track = block->track;
 	year = block->year;
-	
+
 	queue_index = -1;
 	stopafter = 0;
 	genDisplay();
 }
 
 
-struct tune_block *Tune::getBlock(){
-	struct tune_block *block = (struct tune_block *)malloc(sizeof(struct tune_block));
-	memcpy((void *)block->filename, (void *)filename, TUNE_LEN_FNAME);
-	memcpy((void *)block->artist, (void *)artist, TUNE_LEN_ARTIST);
-	memcpy((void *)block->album, (void *)album, TUNE_LEN_ALBUM);
-	memcpy((void *)block->title, (void *)title, TUNE_LEN_TITLE);
-	block->track = track;
-	block->year = year;
-	return block;
+void Tune::getBlock(struct tune_block &block){
+	memcpy((void *)block.filename, (void *)filename, TUNE_LEN_FNAME);
+	memcpy((void *)block.artist, (void *)artist, TUNE_LEN_ARTIST);
+	memcpy((void *)block.album, (void *)album, TUNE_LEN_ALBUM);
+	memcpy((void *)block.title, (void *)title, TUNE_LEN_TITLE);
+	block.track = track;
+	block.year = year;
 }
 
 
 Tune::~Tune(){
-	
+
 }
 
 
-char *Tune::getMenuText(){
-	return displayName;
+char *Tune::getMenuText() const{
+	return (char*)displayName;
 }
 
 ITEM *Tune::getItem(){
@@ -179,12 +177,12 @@ void Tune::parseFile(){
 		strcpy(buffer,tmp.toCString());
 		cleanString(buffer, TUNE_LEN_ALBUM);
 		strcpy(album, buffer);
-	
+
 		tmp = f.tag()->title();
 		strcpy(buffer,tmp.toCString());
 		cleanString(buffer, TUNE_LEN_TITLE);
 		strcpy(title, buffer);
-	
+
 		track = f.tag()->track();
 		year = f.tag()->year();
 	} else guessFile();
@@ -199,7 +197,7 @@ void Tune::guessFile(){
 			cleanString(buffer, TUNE_LEN_TITLE);
 			strcpy(title, buffer);
 			return;
-		}		
+		}
 	}
 
 }
@@ -216,10 +214,10 @@ char *Tune::getAlbum(){ return album; }
 uint32_t Tune::getTrack(){ return track; }
 uint32_t Tune::getYear(){ return year; }
 
-bool tune_compare(Tune* a, Tune* b){
+bool tune_compare(const Tune &a, const Tune &b){
 	char *A, *B;
-	A = a->getMenuText();
-	B = b->getMenuText();
+	A = a.getMenuText();
+	B = b.getMenuText();
 	return strcmp(B, A) > 0;
 }
 

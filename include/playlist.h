@@ -21,9 +21,11 @@
 #define _PLAYLIST_H
 
 #include "tune.h"
-#include <vector>
+#include <deque>
+#include <list>
 #include <menu.h>
 #include <regex.h>
+#include <string>
 
 #define PLAYLIST_MARKER		"*"
 #define MAX_SEARCH_TERMS	8
@@ -32,7 +34,7 @@
 class Playlist {
 	public:
 		uint32_t currIndex;
-		
+
 		Playlist();
 		Playlist(char *filename);
 		bool addTrack(char *filename);
@@ -45,12 +47,15 @@ class Playlist {
 		int readDir(const char* path);
 		MENU *getMenu();
 		Tune *operator[](const int index);
-		
+
 		void play(int index);
+		void play(Tune &tune);
 		void play();
 		void sort();
 		void toggleQueue(int index);
+		void toggleQueue(Tune &tune);
 		void stopAfter(int index);
+		void stopAfter(Tune &tune);
 		int getFirst(char *str);
 		int search(char *str);
 		int nextResult();
@@ -58,9 +63,10 @@ class Playlist {
 		void clearSearch();
 		void clearQueue();
 		void remove(int index);
+		void remove(Tune &tune);
 		void correctList(int start, int change);
-		int save(char *filename);
-		int load(char *filename);
+		int save(const std::string &filename);
+		int load(const std::string &filename);
 		int *getQueue();
 		int queueSize();
 		int dequeued;
@@ -68,15 +74,17 @@ class Playlist {
 		int prevstopafter;
 	protected:
 		MENU *playmenu;
-		std::vector<Tune*> list;
-		std::vector<Tune*>::iterator iter;
+		std::deque<Tune> list;
+		std::deque<Tune>::iterator iter;
 		char **search_term;//Null terminated
 		regex_t **search_exprs;
-		std::vector<int> search_results;
+		std::deque<int> search_results;
 		int search_index;
-		std::vector<uint32_t> play_queue;
+		std::deque<uint32_t> play_queue;
 		void queue(int index);
+		void queue(Tune &tune);
 		bool dequeue(int index);
+		bool dequeue(Tune &tune);
 		void decrementQueue(int start);
 };
 

@@ -51,7 +51,7 @@ class Tune {
 		char *getAlbum();
 		uint32_t getTrack();
 		uint32_t getYear();
-		char *getMenuText();
+		char *getMenuText() const;
 		bool startsWith(char* str);
 		ITEM *getItem();
 		void updateItem(ITEM *item);
@@ -59,11 +59,12 @@ class Tune {
 		void pause();
 		void stop();
 		~Tune();
-		struct tune_block *getBlock();
+		void getBlock(struct tune_block &block);
 		//Null terminated
 		bool query(regex_t **terms);
 
 		char filename[TUNE_LEN_FNAME];
+		uint32_t index;
 		int32_t	queue_index;
 		bool stopafter;
 	protected:
@@ -78,7 +79,7 @@ class Tune {
 		uint32_t track, year;
 };
 
-bool tune_compare(Tune* a, Tune* b);
+bool tune_compare(const Tune& a, const Tune& b);
 static bool compare_i(char a, char b);
 static void cleanString(char *in, int maxlen);
 #endif

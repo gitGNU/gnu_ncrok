@@ -19,15 +19,12 @@
  ***************************************************************************/
 
 /*
- * nCrok.cpp - Contains the UI for the application
+ * ncrok.cpp - Contains the UI for the application
  */
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
 
 #include <ncurses.h>
 #include <panel.h>
-#include <string.h> 
+#include <string.h>
 #include <signal.h>
 #include <termios.h>
 #include <sys/ioctl.h>
@@ -46,13 +43,15 @@
 static Ncrok app;
 static void resizeWin(int ignore);
 
+inline static Tune *tune_from_item(const ITEM *item){return (Tune *)item_userptr(item);}
+
 /*
  * Run everything!
  */
 int main(int argc, char **argv){
 	FILE *hidestderr = freopen ("/dev/null","w",stderr);
 	int count = 0;
-	
+
 	if(argc > 1){
 		int i;
 		for(i = 1; i < argc; i++){
@@ -66,7 +65,7 @@ int main(int argc, char **argv){
 }
 
 Ncrok::Ncrok(){
-	
+
 }
 
 Ncrok::~Ncrok(){
@@ -85,7 +84,7 @@ int Ncrok::initialize(int tracks){
 	cbreak();
 	keypad(stdscr, true);
 	curs_set(0);
-	
+
 	pthread_mutex_init(&display_mutex, NULL);
 
 	initWindows();
@@ -96,7 +95,7 @@ int Ncrok::initialize(int tracks){
 	doupdate();
 	sprintf(title, "%d Tracks",tracks);
 	right.printTitle(title);
-	
+
 	init_gst(this);
 	bottom.printTitle(TITLE_STRING);
 	return 0;
@@ -201,8 +200,8 @@ void Ncrok::runPlaylist(){
 				cur = current_item(playmenu);
 				if(playlist.queueSize() > 0){
 					int *queue = playlist.getQueue();
-					int currqueue = playlist[(uint64_t) item_userptr(cur)]->queue_index;
-					if((uint64_t) item_userptr(cur) == playlist.currIndex){
+					int currqueue = tune_from_item(cur)->queue_index;
+					if(tune_from_item(cur)->index == playlist.currIndex){
 						jumpToIndex(queue[0]);
 						break;
 					}
@@ -231,20 +230,19 @@ void Ncrok::runPlaylist(){
 			case IN_QUEUE:
 				if(item_count(playmenu) == 0) break;
 				cur = current_item(playmenu);
-				playlist.toggleQueue((uint64_t) item_userptr(cur));
+				playlist.toggleQueue(*tune_from_item(cur));
 				updateQueueLabels();
 				break;
 			case IN_STOP_AFTER:
 				if(item_count(playmenu) == 0) break;
 				cur = current_item(playmenu);
-				playlist.stopAfter((uint64_t) item_userptr(cur));
+				playlist.stopAfter(*tune_from_item(cur));
 				updateQueueLabels();
 				break;
 			case IN_DELETE:
 				if(item_count(playmenu) == 0) break;
 				cur = current_item(playmenu);
-				tmp = (uint64_t) item_userptr(cur);
-				if(playlist[tmp] == activetrack){
+				if(tune_from_item(cur) == activetrack){
 					if(tmp > 0)
 						activetrack = playlist.activeTrack();
 				}
@@ -271,12 +269,13 @@ void Ncrok::runPlaylist(){
 }
 
 void Ncrok::playSelected(){
+	if(playlist.size() == 0) return;
 	ITEM *cur;
 	bottom.printCentered("                       ",1);
 	cur = current_item(playmenu);
-	activetrack = (Tune*) playlist[(long) item_userptr(cur)];
+	activetrack = tune_from_item(cur);
 	bottom.printTitle(activetrack->getMenuText());
-	playlist.play((long) item_userptr(cur));
+	playlist.play(*activetrack);
 	pos_menu_cursor(playmenu);
 }
 
@@ -458,7 +457,7 @@ void Ncrok::search(){
 				if(len > 0){
 					playlist.clearSearch();
 					qstring[--len] = 0;
-					
+
 				}
 				else get_out = true;
 				break;
@@ -537,7 +536,7 @@ void Ncrok::updateQueueLabels(){
 		playlist[playlist.prevstopafter]->updateItem(items[playlist.prevstopafter]);
 	}
 	free(queue);
-	
+
 	unpost_menu(playmenu);
 	post_menu(playmenu);
 	set_current_item(playmenu, index);
@@ -608,7 +607,7 @@ void Ncrok::resizeTerm(){
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
 	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) return;
-	
+
 	resizeterm(ws.ws_row, ws.ws_col);
 
 	right.setDims(0,0,ws.ws_col, ws.ws_row - 5);
