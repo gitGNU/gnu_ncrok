@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2011 by Ben Nahill                                      *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -215,10 +215,18 @@ uint32_t Tune::getTrack(){ return track; }
 uint32_t Tune::getYear(){ return year; }
 
 bool tune_compare(const Tune &a, const Tune &b){
-	char *A, *B;
-	A = a.getMenuText();
-	B = b.getMenuText();
-	return strcmp(B, A) > 0;
+	int result;
+	result = strcmp(a.getArtist(), b.getArtist());
+	if(result != 0)
+		return (result < 0);
+	result = strcmp(a.getAlbum(), b.getAlbum());
+	if(result != 0)
+		return (result < 0);
+	result = a.getTrack() - b.getTrack();
+	if(result != 0)
+		return (result < 0);
+	result = strcmp(a.getTitle(), b.getTitle());
+	return (result < 0);
 }
 
 static bool compare_i(char a, char b){

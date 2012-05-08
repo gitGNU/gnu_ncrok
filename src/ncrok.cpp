@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2011 by Ben Nahill                                      *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -606,6 +606,9 @@ void Ncrok::resizeTerm(){
 	//Get the window size directly
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
+	
+	pthread_mutex_lock(&display_mutex);
+	
 	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) return;
 
 	resizeterm(ws.ws_row, ws.ws_col);
@@ -626,6 +629,7 @@ void Ncrok::resizeTerm(){
 	update_panels();
 	refresh();
 	doupdate();
+	pthread_mutex_unlock(&display_mutex);
 }
 
 static void resizeWin(int ignore){

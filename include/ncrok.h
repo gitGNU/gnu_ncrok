@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2011 by Ben Nahill                                      *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
