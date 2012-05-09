@@ -20,12 +20,14 @@
 #ifndef _PLAYLIST_H
 #define _PLAYLIST_H
 
-#include "tune.h"
 #include <deque>
 #include <list>
 #include <menu.h>
 #include <regex.h>
 #include <string>
+#include <stdint.h>
+
+#include "tune.h"
 
 #define PLAYLIST_MARKER		"*"
 #define MAX_SEARCH_TERMS	8
@@ -33,18 +35,15 @@
 
 class Playlist {
 	public:
-		uint32_t currIndex;
-
 		Playlist();
 		Playlist(char *filename);
-		bool addTrack(char *filename);
-//		void addTrack(Tune *track);
+		bool addTrack(const std::string &filename);
 		int size();
 		~Playlist();
 		Tune *nextTrack();
 		Tune *prevTrack();
 		Tune *activeTrack();
-		int readDir(const char* path);
+		int readDir(const std::string &path);
 		MENU *getMenu();
 		Tune *operator[](const int index);
 
@@ -56,7 +55,7 @@ class Playlist {
 		void toggleQueue(Tune &tune);
 		void stopAfter(int index);
 		void stopAfter(Tune &tune);
-		int getFirst(char *str);
+		int getFirst(char *str) const;
 		int search(char *str);
 		int nextResult();
 		int prevResult();
@@ -65,14 +64,24 @@ class Playlist {
 		void remove(int index);
 		void remove(Tune &tune);
 		void correctList(int start, int change);
-		int save(const std::string &filename);
+		int save(const std::string &filename) const;
 		int load(const std::string &filename);
 		int *getQueue();
 		int queueSize();
 		int dequeued;
 		int stopafter; //index
 		int prevstopafter;
+
+		uint32_t currIndex;
 	protected:
+		void queue(int index);
+		void queue(Tune &tune);
+		bool dequeue(int index);
+		bool dequeue(Tune &tune);
+		void decrementQueue(int start);
+
+		static void getCwd(std::string &str);
+
 		MENU *playmenu;
 		std::deque<Tune> list;
 		std::deque<Tune>::iterator iter;
@@ -81,11 +90,6 @@ class Playlist {
 		std::deque<int> search_results;
 		int search_index;
 		std::deque<uint32_t> play_queue;
-		void queue(int index);
-		void queue(Tune &tune);
-		bool dequeue(int index);
-		bool dequeue(Tune &tune);
-		void decrementQueue(int start);
 };
 
 #endif

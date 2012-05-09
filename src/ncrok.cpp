@@ -35,12 +35,12 @@
 #include <stdlib.h>
 
 #include "ncrok.h"
-#include "output.h"
+#include "audio.h"
 #include "tune.h"
 #include "playlist.h"
 #include "window.h"
 
-static Ncrok app;
+Ncrok Ncrok::app;
 static void resizeWin(int ignore);
 
 inline static Tune *tune_from_item(const ITEM *item){return (Tune *)item_userptr(item);}
@@ -55,22 +55,29 @@ int main(int argc, char **argv){
 	if(argc > 1){
 		int i;
 		for(i = 1; i < argc; i++){
-			count += app.playlist.readDir(argv[i]);
+			count += Ncrok::app.playlist.readDir(argv[i]);
 		}
 	}
+
 	printf("\033]0;%s\007", "Ncrok");
-	app.initialize(count);
-	app.runPlaylist();
+	Ncrok::app.initialize(count);
+	Ncrok::app.runPlaylist();
 	return 0;
 }
 
 Ncrok::Ncrok(){
+	struct winsize ws;
+	int fd = open("/dev/tty", O_RDWR);
 
+	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) throw std::exception();
+
+	numRows = ws.ws_row;
+	numCols = ws.ws_col;
 }
 
 Ncrok::~Ncrok(){
 	printf("\033]0;%s\007", "");
-	close_gst();
+	audio.close();
 	endwin();
 }
 
@@ -96,7 +103,7 @@ int Ncrok::initialize(int tracks){
 	sprintf(title, "%d Tracks",tracks);
 	right.printTitle(title);
 
-	init_gst(this);
+	audio.init();
 	bottom.printTitle(TITLE_STRING);
 	return 0;
 }
@@ -109,12 +116,15 @@ void Ncrok::runPlaylist(){
 	ITEM *cur;
 
 	activewin = &right;
+
 	if(playlist.size() == 0){
 		sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
+
 		if((tmp = playlist.load(longtmp)) > 0){
 			sprintf(longtmp2, "Playlist Loaded - %d files", tmp);
 			right.printTitle(longtmp2);
 		}
+
 	}
 	playlist.sort();
 	keypad(right.getWindow(), TRUE);
@@ -135,6 +145,10 @@ void Ncrok::runPlaylist(){
 	while((ch = wgetch(right.getWindow())) != IN_QUIT){
 		pthread_mutex_lock(&display_mutex);
 		switch(ch){
+			case IN_HELP1:
+			case IN_HELP2:
+				showHelpWindow();
+				break;
 			case IN_SAVE:
 				sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
 				if((tmp = playlist.save(longtmp)) <= 0) break;
@@ -170,7 +184,7 @@ void Ncrok::runPlaylist(){
 			case IN_PAUSE:
 				if(activetrack == NULL) break;
 				bottom.printCentered("                       ",1);
-				if(!out_play_pause())
+				if(!audio.playPause())
 					bottom.printCentered("PAUSED",1);
 				//Pause/play
 				break;
@@ -187,7 +201,7 @@ void Ncrok::runPlaylist(){
 				break;
 			case IN_STOP:
 				if(activetrack == NULL) break;
-				out_stop();
+				audio.stop();
 				bottom.printTitle("");
 				bottom.clear();
 				bottom.printCentered("STOPPED",1);
@@ -216,13 +230,13 @@ void Ncrok::runPlaylist(){
 				jumpToIndex(playlist.currIndex);
 				break;
 			case IN_FWD_FINE:
-				out_seek_fine(1); break;
+				audio.seekFine(Audio::DIR_FORWARD); break;
 			case IN_BACK_FINE:
-				out_seek_fine(0); break;
+				audio.seekFine(Audio::DIR_BACKWARD); break;
 			case IN_FWD_COARSE:
-				out_seek_coarse(1); break;
+				audio.seekCoarse(Audio::DIR_FORWARD); break;
 			case IN_BACK_COARSE:
-				out_seek_coarse(0); break;
+				audio.seekCoarse(Audio::DIR_BACKWARD); break;
 			case IN_SEARCH:
 				if(item_count(playmenu) == 0) break;
 				search();
@@ -277,6 +291,47 @@ void Ncrok::playSelected(){
 	bottom.printTitle(activetrack->getMenuText());
 	playlist.play(*activetrack);
 	pos_menu_cursor(playmenu);
+}
+
+void Ncrok::showHelpWindow(){
+	char ch;
+	Window helpWindow;
+	bool get_out = false;
+
+	helpWindow.setDimsFromCenter(numCols/2, numRows/2, 25, 20);
+	helpWindow.printCentered("Apples", 0);
+	helpWindow.printCentered("Turkey", 1);
+	helpWindow.printCentered("Tuna", 23);
+	helpWindow.setScrollable(true);
+
+	helpWindow.show();
+	pthread_mutex_unlock(&display_mutex);
+
+	while(!get_out && ((ch = wgetch(right.getWindow())) != IN_QUIT)){
+		pthread_mutex_lock(&display_mutex);
+		switch(ch){
+		case IN_HELP1:
+		case IN_HELP2:
+		case IN_ESC:
+			get_out = true;
+			break;
+		case IN_UP:
+			helpWindow.doScroll(Window::SCROLL_UP);
+			helpWindow.refresh();
+			break;
+		case IN_DOWN:
+			helpWindow.doScroll(Window::SCROLL_DN);
+			helpWindow.refresh();
+			break;
+		}
+		pthread_mutex_unlock(&display_mutex);
+	}
+	pthread_mutex_lock(&display_mutex);
+	right.reBox();
+	bottom.reBox();
+	right.refresh();
+	left.refresh();
+	pthread_mutex_unlock(&display_mutex);
 }
 
 void Ncrok::initWindows(){
@@ -557,6 +612,7 @@ void Ncrok::setLength(char *len){
 }
 
 void Ncrok::nextTrack(){
+	if(playlist.size() == 0) return;
 	bottom.clear();
 	if((activetrack = playlist.nextTrack()) != NULL){
 		bottom.printTitle(activetrack->getMenuText());
@@ -567,6 +623,7 @@ void Ncrok::nextTrack(){
 }
 
 void Ncrok::prevTrack(){
+	if(playlist.size() == 0) return;
 	if((activetrack = playlist.prevTrack()) != NULL){
 		bottom.printTitle(activetrack->getMenuText());
 		playlist.play();
@@ -606,14 +663,17 @@ void Ncrok::resizeTerm(){
 	//Get the window size directly
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
-	
+
 	pthread_mutex_lock(&display_mutex);
-	
+
 	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) return;
 
 	resizeterm(ws.ws_row, ws.ws_col);
 
-	right.setDims(0,0,ws.ws_col, ws.ws_row - 5);
+	numRows = ws.ws_row;
+	numCols = ws.ws_col;
+
+	right.setDims(0, 0, numRows, ws.ws_row - 5);
 	bottom.setDims(0, ws.ws_row - 5, ws.ws_col, 5);
 
 	int x, y, w, h;
@@ -632,7 +692,7 @@ void Ncrok::resizeTerm(){
 	pthread_mutex_unlock(&display_mutex);
 }
 
-static void resizeWin(int ignore){
-	app.resizeTerm();
+static void resizeWin(int){
+	Ncrok::app.resizeTerm();
 }
 

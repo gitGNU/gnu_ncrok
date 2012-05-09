@@ -18,9 +18,6 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "playlist.h"
-#include "tune.h"
-#include "util.h"
 #include <deque>
 #include <cstdlib>
 #include <cstring>
@@ -31,6 +28,11 @@
 #include <algorithm>
 #include <regex.h>
 #include <string>
+#include <iostream>
+
+#include "playlist.h"
+#include "tune.h"
+#include "util.h"
 
 
 Playlist::Playlist(){
@@ -58,7 +60,7 @@ Tune *Playlist::operator[](const int index){
 	return &list[index];
 }
 
-bool Playlist::addTrack(char *filename){
+bool Playlist::addTrack(const std::string &filename){
 	list.push_back(Tune(filename));
 	//printw("%s\n",list[list.size()-1]->getTitle());
 	//currIndex = list.size() - 1;
@@ -115,51 +117,53 @@ MENU *Playlist::getMenu(){
 /*
  * Recursively (not yet) add a directory and return the number of files found
  */
-int Playlist::readDir(const char* path){
-	//Make sure this path isn't too long
-	if(strlen(path) >= TUNE_LEN_FNAME) return 0;
-	//copy to editable region
-	char directory[TUNE_LEN_FNAME];
-	if(path[0] != '/'){//gstreamer will want absolute paths
-		int start = 0;
-		char *ptr = getcwd(directory, TUNE_LEN_FNAME);
-		while(directory[start] != 0){start++;} //Increment start point to end of cwd
-		directory[start] = '/';
-		strcopy(&directory[start + 1],path,TUNE_LEN_FNAME-(start+1));//Then copy it, getcwd includes trailing slash so get rid of it
-	}
-	else
-		strcopy(directory, path,TUNE_LEN_FNAME);
-	//Strip trailing slash. Don't listen to it. Unless it's root dir.
-	if(directory[strlen(directory) - 1] == '/' && strlen(directory) > 1)
-		directory[strlen(directory) - 1] = 0;
+int Playlist::readDir(const std::string &path){
+	std::string dirPath, subPath;
 	DIR *dir;
-	if((dir = opendir(directory)) == NULL) return 0;
 	int count = 0;
 	struct dirent *dit;
-	char *tmpname = (char*)malloc(TUNE_LEN_FNAME);
 	char *ext;
 	int subcount;
+
+	if(path.length() == 0) return 0;
+
+	if(path[0] != '/'){
+		getCwd(dirPath);
+		//if(*(dirPath.end() - 1) != '/')
+		//	dirPath.append('/', 1);
+		dirPath.append(path);
+	} else {
+		dirPath.assign(path);
+	}
+
+	//if(*(dirPath.end() - 1) == '/')
+	//	dirPath.erase(dirPath.end()-1, dirPath.end());
+
+	if((dir = opendir(dirPath.c_str())) == NULL) return 0;
+
 	while((dit = readdir(dir)) != NULL){
 		if(dit->d_name[0] != '.'){//Eliminate hidden dirs and other pointers
-			sprintf(tmpname,"%s/%s", directory, dit->d_name);
-			subcount = readDir(tmpname);
+			subPath.clear();
+			subPath.assign(dirPath);
+			subPath.append(1, '/');
+			subPath.append(dit->d_name);
+
+			subcount = readDir(subPath);
 			if(subcount > 0){
 				count += subcount;
-			}
-			else if(strlen(dit->d_name) > 5){
-				ext = (char*)((uint64_t)dit->d_name +
-					(uint64_t)(strlen(dit->d_name)-4));
-				if(strcmp(ext,".mp3")==0 || strcmp(ext,".ogg")==0 || strcmp(ext,".m4a")==0){
-					addTrack(tmpname);
-					//printw("%u\n", list[list.size()-1]);
-					//printw("%s\n", activeTrack()->getAlbum());
+			} else {
+				for(ext = dit->d_name + strlen(dit->d_name) - 4; ext > dit->d_name && *ext != '.'; ext--);
+				if(*ext != '.')
+					continue;
+				if(strncmp(ext,".mp3", 4)==0 || strncmp(ext,".ogg", 4)==0 || strncmp(ext,".m4a", 4)==0){
+					addTrack(subPath);
 					count++;
 				}
 			}
 		}
 	}
 	closedir(dir);
-	free(tmpname);
+
 	return count;
 }
 
@@ -279,7 +283,7 @@ void Playlist::stopAfter(Tune &tune){
 	tune.stopafter = true;
 }
 
-int Playlist::getFirst(char *str){
+int Playlist::getFirst(char *str) const{
 	int i;
 	for(i = 0; i < list.size(); i++){
 		if(list[i].startsWith(str)) return i;
@@ -296,7 +300,7 @@ int Playlist::search(char *str){
 	int start = 0;
 	int count = 0;
 	int max = strlen(str);
-	int debug;
+
 	for(i = 0; i <= max; i++){
 		if((str[i] == ' ' || str[i] == 0) && i - start > 0){//space or EOS, not just after another space
 			if(count + 1 == MAX_SEARCH_TERMS) break;
@@ -405,7 +409,7 @@ void Playlist::correctList(int start, int change){
 
 void Playlist::sort(){
 	if(size() > 0)
-		std::sort(list.begin(),list.end(),&tune_compare);
+		std::sort(list.begin(),list.end(),&Tune::tune_compare);
 }
 
 int Playlist::load(const std::string &filename){
@@ -423,13 +427,13 @@ int Playlist::load(const std::string &filename){
 	for(i = 0; i < count; i++){
 		if(fread(&block, sizeof(struct tune_block), 1, fp) < 1)
 			return -1;
-		list.push_back(Tune(&block));
+		list.push_back(Tune(block));
 	}
 	fclose(fp);
 	return i;
 }
 
-int Playlist::save(const std::string &filename){
+int Playlist::save(const std::string &filename) const{
 	FILE *fp;
 	struct tune_block block;
 	if((fp = fopen(filename.c_str(), "w")) == NULL) return -1;
@@ -450,4 +454,14 @@ int Playlist::save(const std::string &filename){
 		return -1; // did not save item count
 	fclose(fp);
 	return count;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Statics
+//////////////////////////////////////////////////////////////////////////////
+
+void Playlist::getCwd(std::string &str){
+	char *tmp = get_current_dir_name();
+	str.assign(tmp);
+	free(tmp);
 }

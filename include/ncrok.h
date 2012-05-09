@@ -37,6 +37,8 @@
 #define IN_REMOVE	'd'
 #define IN_PREV		'['
 #define IN_NEXT		']'
+#define IN_HELP1    '?'
+#define IN_HELP2    'h'
 #define IN_PLAY		10
 #define IN_STOP		's'
 #define IN_QUIT		'q'
@@ -83,6 +85,8 @@ class Ncrok {
 
 		pthread_mutex_t display_mutex;
 
+		static Ncrok app;
+
 	protected:
 		void playSelected();
 		void initWindows();
@@ -93,6 +97,9 @@ class Ncrok {
 		void addDir();
 		void search();
 		void jumpToIndex(int index);
+		void showHelpWindow();
+
+		uint16_t numRows, numCols;
 
 		MENU *playmenu;
 		Tune *activetrack;

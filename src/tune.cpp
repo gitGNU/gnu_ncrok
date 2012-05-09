@@ -20,25 +20,21 @@
 
 #include <tag.h>
 #include <fileref.h>
-#include "tune.h"
-#include "util.h"
 #include <menu.h>
-#include "output.h"
-#include "window.h"
+#include <string>
 #include <string.h>
 #include <regex.h>
 
-Tune::Tune(char *name){
-	*title = 0;
-	*album = 0;
-	*artist = 0;
-	*displayName = 0;
+#include "audio.h"
+#include "window.h"
+#include "tune.h"
+#include "util.h"
+
+Tune::Tune(const std::string &name) :
+	filename(name)
+{
 	track = 0;
 	year = 0;
-	if(strcopy(filename, name, TUNE_LEN_FNAME) == TUNE_LEN_FNAME){
-		fprintf(stderr, "File path is too long. Max: %d\n",TUNE_LEN_FNAME);
-		return;
-	}
 	parseFile();
 	genDisplay();
 	queue_index = -1;
@@ -47,38 +43,34 @@ Tune::Tune(char *name){
 
 void Tune::genDisplay(){
 	char buffer[1024];
-	if(strlen(title) > 0){
-		sprintf(buffer, "%s - %s [%02d] - %s", artist, album, track, title);
-		buffer[TUNE_LEN_DISP-1] = 0;
-		strcpy(displayName,buffer);
+	size_t last_slash;
+
+	displayName.clear();
+	if(title.length() > 0){
+		sprintf(buffer, "%s - %s [%02d] - %s", artist.c_str(), album.c_str(), track, title.c_str());
+		displayName.assign(buffer);
 	}
 	else{
-		int i;
 		//Find filename start index
-		for(i = strlen(filename) - 1; filename[i] != '/' && i >= 0; i--){}
-		//Copy tail of file path
-		if(strlen(&filename[i + 1]) + strlen(artist) < TUNE_LEN_DISP){
-			sprintf(buffer, "%s - %s", artist, &filename[i+1]);
-			buffer[TUNE_LEN_DISP-1] = 0;
-			strcpy(displayName,buffer);
+		last_slash = filename.find_last_of('/');
+		if(artist.length() > 0){
+			sprintf(buffer, "%s - %s", artist.c_str(), filename.c_str() + last_slash + 1);
+			displayName.assign(buffer);
+		} else {
+			displayName.assign(filename);
 		}
-		else if(strlen(&filename[i + 1]) < TUNE_LEN_DISP){
-			strcpy(displayName, &filename[i + 1]);
-		}
-		else {
-			memcpy((void*)displayName,&filename[i + 1], min(TUNE_LEN_DISP - 1, TUNE_LEN_FNAME - (i + 1)) );
-			displayName[min(TUNE_LEN_DISP - 1, TUNE_LEN_FNAME - (i + 1))] = 0;
-		};
 	}
 }
 
-Tune::Tune(struct tune_block *block){
-	memcpy((void *)filename, (void *)block->filename, TUNE_LEN_FNAME);
-	memcpy((void *)artist, (void *)block->artist, TUNE_LEN_ARTIST);
-	memcpy((void *)album, (void *)block->album, TUNE_LEN_ALBUM);
-	memcpy((void *)title, (void *)block->title, TUNE_LEN_TITLE);
-	track = block->track;
-	year = block->year;
+Tune::Tune(struct tune_block &block) :
+	filename(block.filename)
+{
+	artist.assign(block.artist);
+	album.assign(block.album);
+	title.assign(block.title);
+
+	track = block.track;
+	year = block.year;
 
 	queue_index = -1;
 	stopafter = 0;
@@ -86,11 +78,12 @@ Tune::Tune(struct tune_block *block){
 }
 
 
-void Tune::getBlock(struct tune_block &block){
-	memcpy((void *)block.filename, (void *)filename, TUNE_LEN_FNAME);
-	memcpy((void *)block.artist, (void *)artist, TUNE_LEN_ARTIST);
-	memcpy((void *)block.album, (void *)album, TUNE_LEN_ALBUM);
-	memcpy((void *)block.title, (void *)title, TUNE_LEN_TITLE);
+void Tune::getBlock(struct tune_block &block) const{
+	strncpy(block.filename, filename.c_str(), TUNE_LEN_FNAME);
+	strncpy(block.artist, artist.c_str(), TUNE_LEN_ARTIST);
+	strncpy(block.album, album.c_str(), TUNE_LEN_ALBUM);
+	strncpy(block.title, title.c_str(), TUNE_LEN_TITLE);
+
 	block.track = track;
 	block.year = year;
 }
@@ -101,8 +94,8 @@ Tune::~Tune(){
 }
 
 
-char *Tune::getMenuText() const{
-	return (char*)displayName;
+const std::string &Tune::getMenuText() const{
+	return displayName;
 }
 
 ITEM *Tune::getItem(){
@@ -111,11 +104,11 @@ ITEM *Tune::getItem(){
 	sprintf(item_text, "   ");
 	if(queue_index != -1){
 		if(queue_index > 8)
-			sprintf(item_text,"%d %s",queue_index+1, displayName);
-		else sprintf(item_text,"%d  %s",queue_index+1, displayName);
+			sprintf(item_text,"%d %s",queue_index+1, displayName.c_str());
+		else sprintf(item_text,"%d  %s",queue_index+1, displayName.c_str());
 	}
 	else {
-		strcpy(item_text + 3, displayName);
+		strcpy(item_text + 3, displayName.c_str());
 	}
 	if(stopafter) item_text[2] = '*';
 	item_text[TUNE_LEN_ITEM - 1] = 0;
@@ -128,16 +121,16 @@ void Tune::updateItem(ITEM *item){
 	sprintf(item_text, "   ");
 	if(queue_index != -1){
 		if(queue_index > 8)//needs 2 digits
-			sprintf(item_text,"%d %s",queue_index+1, displayName);
-		else sprintf(item_text,"%d  %s",queue_index+1, displayName);
+			sprintf(item_text,"%d %s",queue_index+1, displayName.c_str());
+		else sprintf(item_text,"%d  %s",queue_index+1, displayName.c_str());
 	}
-	else sprintf(item_text,"   %s",displayName);
+	else sprintf(item_text,"   %s",displayName.c_str());
 	if(stopafter) item_text[2] = '*';
 	free((void*)item->name.str);
 	item->name.str = item_text;
 }
 
-bool Tune::startsWith(char* str){
+bool Tune::startsWith(char* str) const{
 	int len = strlen(str);
 	char i;
 	for(i = 0; i < strlen(str); i++){
@@ -146,12 +139,12 @@ bool Tune::startsWith(char* str){
 	return true;
 }
 
-bool Tune::query(regex_t **terms){
+bool Tune::query(regex_t **terms) const{
 	char i;
 	for(i = 0; terms[i] != NULL; i++){
-		if(regexec(terms[i], artist, 0, NULL, 0) != 0 &&
-		   regexec(terms[i], title, 0, NULL, 0) != 0 &&
-		   regexec(terms[i], album, 0, NULL, 0) != 0)
+		if(regexec(terms[i], artist.c_str(), 0, NULL, 0) != 0 &&
+		   regexec(terms[i], title.c_str(), 0, NULL, 0) != 0 &&
+		   regexec(terms[i], album.c_str(), 0, NULL, 0) != 0)
 		return false;
 	}
 	return true;
@@ -160,9 +153,8 @@ bool Tune::query(regex_t **terms){
 void Tune::parseFile(){
 	//Use a big buffer to cut down the size of the text copied
 	char buffer[1024];
-	char *tmpfile = (char *)malloc(TUNE_LEN_FNAME);
-	strcpy(tmpfile, filename);
-	TagLib::FileRef f(tmpfile);
+	TagLib::FileRef f(filename.c_str());
+
 	if(f.tag()->isEmpty()) {
 		guessFile();
 		return;
@@ -170,18 +162,18 @@ void Tune::parseFile(){
 	TagLib::String tmp = f.tag()->artist();
 	strcpy(buffer,tmp.toCString());
 	cleanString(buffer, TUNE_LEN_ARTIST);
-	strcpy(artist,buffer);
+	artist.assign(buffer);
 
-	if(strlen(artist) != 0){ //Do the rest
+	if(artist.length() != 0){ //Do the rest
 		tmp = f.tag()->album();
 		strcpy(buffer,tmp.toCString());
 		cleanString(buffer, TUNE_LEN_ALBUM);
-		strcpy(album, buffer);
+		album.assign(buffer);
 
 		tmp = f.tag()->title();
 		strcpy(buffer,tmp.toCString());
 		cleanString(buffer, TUNE_LEN_TITLE);
-		strcpy(title, buffer);
+		title.assign(buffer);
 
 		track = f.tag()->track();
 		year = f.tag()->year();
@@ -189,43 +181,40 @@ void Tune::parseFile(){
 }
 
 void Tune::guessFile(){
-	int length = strlen(filename);
 	char buffer[512];
-	for(int i = length; i >= 0; i--){
-		if(filename[i] == '/'){
-			strcpy(buffer, &(filename[i+1]));
-			cleanString(buffer, TUNE_LEN_TITLE);
-			strcpy(title, buffer);
-			return;
-		}
+	size_t last_slash = filename.find_last_of('/');
+	if(last_slash != std::string::npos){
+		strcpy(buffer, filename.c_str() + last_slash + 1);
+		cleanString(buffer, TUNE_LEN_TITLE);
+		title.assign(buffer);
 	}
-
 }
 
-void Tune::play(){
-	char* path = (char*)malloc(512);
-	sprintf(path,"file://%s",filename);
-	play_path(path);
+void Tune::play() const{
+	std::string path("file://");
+	path.append(filename);
+	audio.playPath(path);
 }
 
-char *Tune::getArtist(){ return artist; }
-char *Tune::getTitle(){ return title; }
-char *Tune::getAlbum(){ return album; }
-uint32_t Tune::getTrack(){ return track; }
-uint32_t Tune::getYear(){ return year; }
+const std::string &Tune::getAlbum() const { return album; }
+const std::string &Tune::getArtist() const { return artist; }
+const std::string &Tune::getTitle() const { return title; }
 
-bool tune_compare(const Tune &a, const Tune &b){
+uint32_t Tune::getTrack() const{ return track; }
+uint32_t Tune::getYear() const{ return year; }
+
+bool Tune::tune_compare(const Tune &a, const Tune &b){
 	int result;
-	result = strcmp(a.getArtist(), b.getArtist());
+	result = a.artist.compare(b.artist);
 	if(result != 0)
 		return (result < 0);
-	result = strcmp(a.getAlbum(), b.getAlbum());
+	result = a.album.compare(b.album);
 	if(result != 0)
 		return (result < 0);
-	result = a.getTrack() - b.getTrack();
+	result = a.track - b.track;
 	if(result != 0)
 		return (result < 0);
-	result = strcmp(a.getTitle(), b.getTitle());
+	result = a.title.compare(b.title);
 	return (result < 0);
 }
 

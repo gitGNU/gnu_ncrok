@@ -18,31 +18,16 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-
 #include <gst/gst.h>
-#include <stdbool.h>
-#include "output.h"
-#include "ncrok.h"
 #include <signal.h>
 #include <sys/time.h>
-#include <pthread.h>
 
-static bool update_time();
-void out_seek_rel(int64_t micros);
+#include "audio.h"
+#include "ncrok.h"
 
-static GMainLoop *loop;
-GstBus *bus;
-GstElement *pipeline;
-char out_state;
-Ncrok *ncrok;
-gint64 len;
-int failupdates;
+Audio audio;
 
-pthread_t out_thread;
-pthread_attr_t out_attr;
-
-void init_gst(Ncrok *ref){
-	ncrok = ref;
+void Audio::init(){
 	gst_init(NULL, NULL);
 	// Use default context
 	loop = g_main_loop_new (NULL, false);
@@ -52,24 +37,21 @@ void init_gst(Ncrok *ref){
 	failupdates = 0;
 	pthread_attr_init(&out_attr);
 	pthread_attr_setdetachstate(&out_attr, PTHREAD_CREATE_JOINABLE);
-	pthread_create(&out_thread, &out_attr, out_gst_run, NULL);
+	pthread_create(&out_thread, &out_attr, gstRun, this);
 }
 
-void close_gst(){
+void Audio::close(){
 	gst_element_set_state (GST_ELEMENT (pipeline), GST_STATE_NULL);
 	gst_object_unref(GST_OBJECT (pipeline));
 	out_state = OUT_STATE_NOTREADY;
 	pthread_cancel(out_thread);
 }
 
-static gboolean bus_call (
-		GstBus *bus,
-		GstMessage *msg,
-		gpointer user_data) {
+gboolean Audio::busCall(GstBus *bus, GstMessage *msg){
 	switch (GST_MESSAGE_TYPE (msg)){
 		case GST_MESSAGE_EOS:
-			out_stop();
-			ncrok->nextTrack();
+			stop();
+			Ncrok::app.nextTrack();
 			//g_message ("End of Stream");
 			break;
 		case GST_MESSAGE_ERROR:
@@ -92,52 +74,50 @@ static gboolean bus_call (
 	return true;
 }
 
-static bool out_get_length(void){
+
+
+bool Audio::getLength(){
 	GstFormat fmt = GST_FORMAT_TIME;
 	char lenstr[16];
 	gst_element_query_duration(pipeline, &fmt, &len);
 	// Got a valid length
 	if( len > 100 ){
 		g_snprintf(lenstr, 16, OUT_TIME_FMT, GST_TIME_ARGS(len));
-		ncrok->setLength(lenstr);
+		Ncrok::app.setLength(lenstr);
 		// Don't run again
 		return false;
 	}
 	return true;
 }
 
-void play_path (gchar *path){
+bool Audio::getLengthCB(void *ptr){
+	Audio *a = (Audio *)ptr;
+	return a->getLength();
+}
+
+void Audio::playPath(const std::string &path){
 	if(out_state != OUT_STATE_STOPPED){
-		out_stop();
+		stop();
 	}
-	if(path){
-		g_object_set(G_OBJECT (pipeline), "uri", path, NULL);
+	if(path.length()){
+		g_object_set(G_OBJECT (pipeline), "uri", path.c_str(), NULL);
 
 		bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline));
-		gst_bus_add_watch (bus, bus_call, NULL);
+		gst_bus_add_watch (bus, busCallCB, this);
 		// Update time every half second
-		g_timeout_add (500, (GSourceFunc) update_time, NULL);
+		g_timeout_add (500, (GSourceFunc) updateTimeCB, this);
 		// Check for track length every 100ms (until successful)
-		g_timeout_add (100, (GSourceFunc) out_get_length, NULL);
+		g_timeout_add (100, (GSourceFunc) getLengthCB, this);
 		gst_object_unref (bus);
 		gst_element_set_state (GST_ELEMENT (pipeline), GST_STATE_PLAYING);
 		out_state = OUT_STATE_PLAYING;
 	}
-	free(path);
-	ncrok->reDraw();
+	Ncrok::app.reDraw();
 }
 
-//GST Main loop pthread function.
-void *out_gst_run(void *null){
-	while(1){
-		g_main_loop_run(loop);
-		pthread_testcancel();
-	}
-	pthread_exit((void *) 0);
-}
 
 //Returns true on play
-bool out_play_pause(){
+bool Audio::playPause(){
 	switch(out_state){
 		case OUT_STATE_PAUSED:
 			gst_element_set_state(GST_ELEMENT (pipeline), GST_STATE_PLAYING);
@@ -151,7 +131,7 @@ bool out_play_pause(){
 
 }
 
-static bool update_time(){
+bool Audio::updateTime(){
 	GstFormat fmt = GST_FORMAT_TIME;
 	gint64 pos;
 	if(out_state == OUT_STATE_STOPPED){
@@ -163,19 +143,19 @@ static bool update_time(){
 		return false;
 	}
 	failupdates = 0;
-	pthread_mutex_lock(&ncrok->display_mutex);
+	pthread_mutex_lock(&Ncrok::app.display_mutex);
 	if (gst_element_query_position (pipeline, &fmt, &pos)) {
 		char *posstr;
 		posstr = (char*)malloc(16);
 		g_snprintf(posstr,16,OUT_TIME_FMT, GST_TIME_ARGS(pos));
 		double rel = (double)pos / (double)len;
-		ncrok->updateTime(posstr, rel);
+		Ncrok::app.updateTime(posstr, rel);
 	}
-	pthread_mutex_unlock(&ncrok->display_mutex);
+	pthread_mutex_unlock(&Ncrok::app.display_mutex);
 	return true;
 }
 
-void out_stop(){
+void Audio::stop(){
 	GstState state;
 	gst_element_set_state (GST_ELEMENT (pipeline), GST_STATE_NULL);
 	gst_element_get_state (GST_ELEMENT (pipeline), &state, NULL, GST_CLOCK_TIME_NONE);
@@ -186,17 +166,17 @@ void out_stop(){
 	out_state = OUT_STATE_STOPPED;
 }
 
-void out_seek_fine(bool dir){
-	if(dir) out_seek_rel(OUT_SEEK_FINE);
-	else out_seek_rel(-1 * OUT_SEEK_FINE);
+void Audio::seekFine(dir_t dir){
+	if(dir == DIR_FORWARD) seekRel(OUT_SEEK_FINE);
+	else seekRel(-1 * OUT_SEEK_FINE);
 }
 
-void out_seek_coarse(bool dir){
-	if(dir) out_seek_rel(OUT_SEEK_COARSE);
-	else out_seek_rel(-1 * OUT_SEEK_COARSE);
+void Audio::seekCoarse(dir_t dir){
+	if(dir == DIR_FORWARD) seekRel(OUT_SEEK_COARSE);
+	else seekRel(-1 * OUT_SEEK_COARSE);
 }
 
-void out_seek_rel(int64_t micros){
+void Audio::seekRel(int64_t micros){
 	if(out_state != OUT_STATE_PLAYING && out_state != OUT_STATE_PAUSED) return;
 	GstFormat fmt = GST_FORMAT_TIME;
 	gint64 pos, len, newtime;
@@ -207,7 +187,7 @@ void out_seek_rel(int64_t micros){
 		newtime = pos + (GST_MSECOND * micros);
 		if(newtime < 0) newtime = 0;
 		if(newtime > len){
-			ncrok->nextTrack();
+			Ncrok::app.nextTrack();
 			return;
 		}
 
@@ -215,3 +195,24 @@ void out_seek_rel(int64_t micros){
 	}
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Statics
+//////////////////////////////////////////////////////////////////////////////
+
+gboolean Audio::busCallCB(GstBus *_bus, GstMessage *msg, gpointer ptr) {
+	return ((Audio *)ptr)->busCall(_bus, msg);
+}
+
+//GST Main loop pthread function.
+void *Audio::gstRun(void *ptr){
+	Audio *a = (Audio *)ptr;
+	while(1){
+		g_main_loop_run(a->loop);
+		pthread_testcancel();
+	}
+	pthread_exit((void *) 0);
+}
+
+bool Audio::updateTimeCB(void *ptr){
+	return ((Audio *)ptr)->updateTime();
+}

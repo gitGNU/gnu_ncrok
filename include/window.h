@@ -23,13 +23,23 @@
 #include <panel.h>
 #include <menu.h>
 
+#include <string>
+
 
 class Window{
 	public:
+		typedef enum {
+			SCROLL_UP,
+			SCROLL_DN
+		} scroll_dir_t;
+
 		Window(int xx, int yy, int ww, int hh);
 		Window();
 		~Window();
+
 		void setDims(int x, int y, int w, int h);
+		void setDimsFromCenter(int x, int y, int w, int h);
+
 		void getDims(int* xx, int* yy, int* ww, int* hh);
 		int getHeight();
 		int getWidth();
@@ -38,8 +48,8 @@ class Window{
 		PANEL* getPanel();
 		MENU*	getMenu();
 		void pointPanelTo(Window* win);
-		void printTitle(const char* ntitle);
-		void printCentered(const char* text, int y);
+		void printTitle(const std::string &ntitle);
+		void printCentered(const std::string &text, int y);
 		void refresh();
 		void hide();
 		void show();
@@ -47,8 +57,11 @@ class Window{
 		void clear();
 		void touch();
 		void reDraw();
+		void setScrollable(bool s){scrollok(window, s);}
+		void doScroll(scroll_dir_t dir);
+
 	private:
-		char title[256];
+		std::string title;
 		MENU* menu;
 		int x, y, w, h;
 		WINDOW* window;

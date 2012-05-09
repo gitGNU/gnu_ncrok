@@ -44,42 +44,49 @@ struct tune_block {
 
 class Tune {
 	public:
-		Tune(char *name);
-		Tune(struct tune_block *block);
-		char *getTitle();
-		char *getArtist();
-		char *getAlbum();
-		uint32_t getTrack();
-		uint32_t getYear();
-		char *getMenuText() const;
-		bool startsWith(char* str);
+		Tune(const std::string &name);
+		Tune(struct tune_block &block);
+		const std::string &getTitle() const;
+		const std::string &getArtist() const;
+		const std::string &getAlbum() const;
+		uint32_t getTrack() const;
+		uint32_t getYear() const;
+		const std::string &getMenuText() const;
+		bool startsWith(char* str) const;
 		ITEM *getItem();
 		void updateItem(ITEM *item);
-		void play();
+		void play() const;
 		void pause();
 		void stop();
 		~Tune();
-		void getBlock(struct tune_block &block);
+		void getBlock(struct tune_block &block) const;
 		//Null terminated
-		bool query(regex_t **terms);
+		bool query(regex_t **terms) const;
 
-		char filename[TUNE_LEN_FNAME];
+		std::string filename;
 		uint32_t index;
 		int32_t	queue_index;
 		bool stopafter;
+
+		static bool tune_compare(const Tune &a, const Tune &b);
 	protected:
 		void genDisplay();
 		void parseFile();
 		void guessFile();
 
+		std::string artist;
+		std::string album;
+		std::string title;
+		std::string displayName;
+/*
 		char artist[TUNE_LEN_ARTIST];
 		char album[TUNE_LEN_ALBUM];
 		char title[TUNE_LEN_TITLE];
 		char displayName[TUNE_LEN_DISP];
+*/
 		uint32_t track, year;
 };
 
-bool tune_compare(const Tune& a, const Tune& b);
 static bool compare_i(char a, char b);
 static void cleanString(char *in, int maxlen);
 #endif

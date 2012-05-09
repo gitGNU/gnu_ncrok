@@ -18,24 +18,25 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "window.h"
 #include <ncurses.h>
 #include <panel.h>
 #include <menu.h>
 #include <string.h>
+#include <string>
 #include <cstdlib>
 
+#include "window.h"
+
 Window::Window(int xx, int yy, int ww, int hh){
-	x = xx; y = yy; w = ww; h = hh;
-	init();
+	setDims(xx, yy, ww, hh);
 }
 
 Window::Window(){
-	title[0] = 0;
+
 }
 
 Window::~Window(){
-
+	delwin(window);
 }
 
 void Window::init(){
@@ -52,6 +53,10 @@ void Window::init(){
 void Window::setDims(int xx, int yy, int ww, int hh){
 	x = xx; y = yy; w = ww; h = hh;
 	init();
+}
+
+void Window::setDimsFromCenter(int x, int y, int w, int h){
+	setDims(x - w/2, y - h / 2, w, h);
 }
 
 void Window::getDims(int* xx, int* yy, int* ww, int* hh){
@@ -73,14 +78,13 @@ void Window::clear(){
 	refresh();
 }
 
-void Window::printTitle(const char* ntitle){
-	strcpy(title, ntitle);
+void Window::printTitle(const std::string &ntitle){
+	title.assign(ntitle);
 	reBox();
 }
 
-void Window::printCentered(const char* text, int y){
-	int len = strlen(text);
-	mvwprintw(window, y, (w/2)-(len/2), "%s", text);
+void Window::printCentered(const std::string &text, int y){
+	mvwprintw(window, y, (w/2)-(text.length()/2), "%s", text.c_str());
 	wrefresh(window);
 }
 
@@ -132,5 +136,16 @@ void Window::touch(){
 
 void Window::reDraw(){
 	redrawwin(window);
+}
+
+void Window::doScroll(scroll_dir_t dir){
+	switch(dir){
+	case SCROLL_UP:
+		wscrl(window, 1);
+		break;
+	case SCROLL_DN:
+		wscrl(window, -1);
+		break;
+	}
 }
 

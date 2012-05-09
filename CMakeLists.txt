@@ -6,12 +6,12 @@ find_package(PkgConfig)
 set(SRC_DIR src)
 
 set(SOURCES
-    ${SRC_DIR}/ncrok.cpp
-    ${SRC_DIR}/playlist.cpp
-    ${SRC_DIR}/window.cpp
-    ${SRC_DIR}/tune.cpp
-    ${SRC_DIR}/util.cpp
-    ${SRC_DIR}/output.cpp
+	${SRC_DIR}/ncrok.cpp
+	${SRC_DIR}/playlist.cpp
+	${SRC_DIR}/window.cpp
+	${SRC_DIR}/tune.cpp
+	${SRC_DIR}/util.cpp
+	${SRC_DIR}/audio.cpp
 )
 
 pkg_check_modules(GST REQUIRED gstreamer-0.10)

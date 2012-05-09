@@ -41,14 +41,41 @@
 
 #define OUT_MAX_FAIL		3
 
-void init_gst(Ncrok *app);
-void close_gst();
-void play_path (gchar *path);
-bool out_play_pause();
-void out_seek_fine(bool dir);
-void out_seek_coarse(bool dir);
-void out_stop();
-static bool out_get_length();
-void *out_gst_run(void *null);
+class Audio {
+public:
+	typedef enum {
+		DIR_BACKWARD,
+		DIR_FORWARD
+	} dir_t;
+
+	void init();
+	void close();
+	void playPath(const std::string &path);
+	bool playPause();
+	void seekFine(dir_t dir);
+	void seekCoarse(dir_t dir);
+	void stop();
+protected:
+	void seekRel(int64_t micros);
+
+	gboolean busCall(GstBus *bus, GstMessage *msg);
+	static gboolean busCallCB(GstBus *bus, GstMessage *msg, gpointer user_data);
+	bool getLength();
+	static bool getLengthCB(void *ptr);
+	bool updateTime();
+	static bool updateTimeCB(void *ptr);
+	static void *gstRun(void *ptr);
+
+	GMainLoop *loop;
+	GstBus *bus;
+	GstElement *pipeline;
+	char out_state;
+	gint64 len;
+	int failupdates;
+	pthread_t out_thread;
+	pthread_attr_t out_attr;
+};
+
+extern Audio audio;
 
 #endif
