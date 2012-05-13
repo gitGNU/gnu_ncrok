@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -18,22 +18,30 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <sys/types.h>
+#ifndef _PLAYLIST_WINDOW_H
+#define _PLAYLIST_WINDOW_H
 
-#include "util.h"
+#include "window.h"
 
-size_t strcopy( char *dst, const char *src, size_t length ){
-	size_t count = length;
-	while(*src != 0 && --count > 0)
-		*(dst++) = *(src++);
-	*dst = 0;
-	return length - count;
-}
+class PlaylistWindow : public Window {
+public:
+    PlaylistWindow();
 
-int max( int a, int b ){
-	return (a > b)? a : b;
-}
+    void assignMenu(MENU *m);
+    void scrollUp(int count);
+    void scrollDown(int count);
+    int itemCount(){return item_count(menu);}
+    ITEM *getCurrentItem(){return current_item(menu);}
+    void posCursor(){pos_menu_cursor(menu);}
+    void setItem(ITEM *item){set_current_item(menu, item);}
+    ITEM **getItems(){return menu_items(menu);}
+    void unpost(){unpost_menu(menu);}
+    void post(){post_menu(menu);}
 
-int min( int a, int b ){
-	return (a < b)? a : b;
-}
+    void display(int screenCols, int screenRows);
+    void redraw(int screenCols, int screenRows);
+private:
+    MENU *menu;
+};
+
+#endif

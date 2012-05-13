@@ -51,9 +51,7 @@ class Playlist {
 		void play(Tune &tune);
 		void play();
 		void sort();
-		void toggleQueue(int index);
 		void toggleQueue(Tune &tune);
-		void stopAfter(int index);
 		void stopAfter(Tune &tune);
 		int getFirst(char *str) const;
 		int search(char *str);
@@ -61,18 +59,18 @@ class Playlist {
 		int prevResult();
 		void clearSearch();
 		void clearQueue();
-		void remove(int index);
 		void remove(Tune &tune);
 		void correctList(int start, int change);
 		int save(const std::string &filename) const;
 		int load(const std::string &filename);
-		int *getQueue();
-		int queueSize();
 		int dequeued;
 		int stopafter; //index
 		int prevstopafter;
 
 		uint32_t currIndex;
+
+		typedef std::deque<uint32_t> play_queue_t;
+		const play_queue_t &getQueue() const{return play_queue;}
 	protected:
 		void queue(int index);
 		void queue(Tune &tune);
@@ -83,13 +81,16 @@ class Playlist {
 		static void getCwd(std::string &str);
 
 		MENU *playmenu;
-		std::deque<Tune> list;
-		std::deque<Tune>::iterator iter;
+
+		typedef std::deque<Tune> list_t;
+
+		list_t list;
+		list_t::iterator iter;
 		char **search_term;//Null terminated
 		regex_t **search_exprs;
 		std::deque<int> search_results;
 		int search_index;
-		std::deque<uint32_t> play_queue;
+		play_queue_t play_queue;
 };
 
 #endif

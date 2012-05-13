@@ -22,10 +22,15 @@
 #define _NCROCK_H
 
 #include "window.h"
+#include "playlistwindow.h"
+#include "bottomwindow.h"
+#include "helpwindow.h"
 #include "playlist.h"
+
 #include <ncurses.h>
 #include <form.h>
 #include <pthread.h>
+#include <deque>
 
 #define IN_UP		(char)KEY_UP
 #define IN_DOWN		(char)KEY_DOWN
@@ -63,13 +68,13 @@
 #define IN_LOAD		'l'
 #define IN_JUMP		'j'
 
-#define TITLE_STRING	"Welcome to Ncrok 0.55! This is the future!"
+#define TITLE_STRING	"Welcome to Ncrok 0.60! This is the future!"
 
 class Ncrok {
 	public:
 		Ncrok();
 		~Ncrok();
-		int initialize(int tracks);
+		void initialize(int tracks);
 		void runPlaylist();
 		void nextTrack();
 		void prevTrack();
@@ -79,15 +84,13 @@ class Ncrok {
 		void resizeTerm();
 
 		Playlist playlist;
-		Window left;
-		Window right;
-		Window bottom;
 
-		pthread_mutex_t display_mutex;
+		PlaylistWindow right;
+		BottomWindow bottom;
 
 		static Ncrok app;
 
-	protected:
+	private:
 		void playSelected();
 		void initWindows();
 		void updateQueueLabels();
@@ -98,13 +101,22 @@ class Ncrok {
 		void search();
 		void jumpToIndex(int index);
 		void showHelpWindow();
+		void deleteSelected();
+		void stop();
+
+		void updatePanels();
+		void doJumpAction();
+
+		void lockDisplay(){pthread_mutex_lock(&display_mutex);}
+		void unlockDisplay(){pthread_mutex_unlock(&display_mutex);}
+		pthread_mutex_t display_mutex;
+		pthread_mutexattr_t attr;
 
 		uint16_t numRows, numCols;
 
-		MENU *playmenu;
 		Tune *activetrack;
-		Window *activewin;
 		char length[16];
+		std::deque<Window *> windows;
 };
 
 

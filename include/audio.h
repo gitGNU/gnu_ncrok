@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -17,6 +17,7 @@
  *   Free Software Foundation, Inc.,                                       *
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
+
 #ifndef _OUTPUT_H
 #define _OUTPUT_H
 
@@ -43,37 +44,37 @@
 
 class Audio {
 public:
-	typedef enum {
-		DIR_BACKWARD,
-		DIR_FORWARD
-	} dir_t;
+    typedef enum {
+        DIR_BACKWARD,
+        DIR_FORWARD
+    } dir_t;
 
-	void init();
-	void close();
-	void playPath(const std::string &path);
-	bool playPause();
-	void seekFine(dir_t dir);
-	void seekCoarse(dir_t dir);
-	void stop();
+    void init();
+    void close();
+    void playPath(const std::string &path);
+    bool playPause();
+    void seekFine(dir_t dir);
+    void seekCoarse(dir_t dir);
+    void stop();
 protected:
-	void seekRel(int64_t micros);
+    void seekRel(int64_t micros);
 
-	gboolean busCall(GstBus *bus, GstMessage *msg);
-	static gboolean busCallCB(GstBus *bus, GstMessage *msg, gpointer user_data);
-	bool getLength();
-	static bool getLengthCB(void *ptr);
-	bool updateTime();
-	static bool updateTimeCB(void *ptr);
-	static void *gstRun(void *ptr);
+    gboolean busCall(GstBus *bus, GstMessage *msg);
+    static gboolean busCallCB(GstBus *bus, GstMessage *msg, gpointer user_data);
+    bool getLength();
+    static bool getLengthCB(void *ptr);
+    bool updateTime();
+    static bool updateTimeCB(void *ptr);
+    static void *gstRun(void *ptr);
 
-	GMainLoop *loop;
-	GstBus *bus;
-	GstElement *pipeline;
-	char out_state;
-	gint64 len;
-	int failupdates;
-	pthread_t out_thread;
-	pthread_attr_t out_attr;
+    GMainLoop *loop;
+    GstBus *bus;
+    GstElement *pipeline;
+    char out_state;
+    gint64 len;
+    int failupdates;
+    pthread_t out_thread;
+    pthread_attr_t out_attr;
 };
 
 extern Audio audio;

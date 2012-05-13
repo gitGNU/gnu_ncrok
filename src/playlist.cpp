@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -32,7 +32,6 @@
 
 #include "playlist.h"
 #include "tune.h"
-#include "util.h"
 
 
 Playlist::Playlist(){
@@ -105,7 +104,7 @@ MENU *Playlist::getMenu(){
 	ITEM **items = (ITEM**)calloc(list.size()+1, sizeof(ITEM*));
 	char *tmp;
 	uint32_t count = 0;
-	for(std::deque<Tune>::iterator iter = list.begin(); iter != list.end(); iter++){
+	for(list_t::iterator iter = list.begin(); iter != list.end(); iter++){
 		items[count] = (*iter).getItem();
 		(*iter).index = count;
 		set_item_userptr(items[count++], &(*iter));
@@ -194,33 +193,14 @@ void Playlist::queue(Tune &tune){
 	tune.queue_index = play_queue.size()-1;
 }
 
-/*
- * returns true if index found
- */
-bool Playlist::dequeue(int index){
-	int pos = list[index].queue_index;
-	if(pos < 0) return false;
-	list[index].queue_index = -1;
-	play_queue.erase(play_queue.begin() + pos);
-	dequeued = index;
-	decrementQueue(pos);
-}
-
 bool Playlist::dequeue(Tune &tune){
 	int pos = tune.queue_index;
 	if(pos < 0) return false;
+	tune.queue_index = -1;
 	play_queue.erase(play_queue.begin() + pos);
 	dequeued = tune.index;
 	decrementQueue(pos);
-}
-
-void Playlist::toggleQueue(int index){
-	if(list[index].queue_index == -1){
-		queue(index);
-	}
-	else{
-		dequeue(index);
-	}
+	return true;
 }
 
 void Playlist::toggleQueue(Tune &tune){
@@ -231,43 +211,11 @@ void Playlist::toggleQueue(Tune &tune){
 	}
 }
 
-int Playlist::queueSize(){
-	return play_queue.size();
-}
-
-int *Playlist::getQueue(){
-	int *ret = (int *)calloc(queueSize(),sizeof(int));
-	std::deque<uint32_t>::iterator queue_iter;
-	queue_iter = play_queue.begin();
-	int i = 0;
-	while(queue_iter != play_queue.end()){
-		ret[i++] = *queue_iter;
-		queue_iter++;
-	}
-	return ret;
-}
-
 void Playlist::decrementQueue(int start){
 	int size = play_queue.size();
 	for(int i = start; i < size; i++){
 		list[play_queue[i]].queue_index--;
 	}
-}
-
-/*
- *  Toggle stop-after for a track at index
- */
-void Playlist::stopAfter(int index){
-	prevstopafter = stopafter;
-	if(stopafter == index){
-		stopafter = -1;
-		list[index].stopafter = 0;
-		return;
-	}
-	if(prevstopafter != -1)
-		list[prevstopafter].stopafter = 0;
-	stopafter = index;
-	list[index].stopafter = 1;
 }
 
 void Playlist::stopAfter(Tune &tune){
@@ -370,30 +318,43 @@ void Playlist::clearSearch(){
  * intended for use before adding additional tracks where indices may change
  */
 void Playlist::clearQueue(){
-	while(queueSize() != 0){
-		toggleQueue(play_queue.back());
+	while(play_queue.size() != 0){
+		toggleQueue(list[play_queue.back()]);
 	}
 	if(stopafter > -1)
-		stopAfter(stopafter);
+		stopAfter(list[stopafter]);
 	dequeued = -1;
 	prevstopafter = -1;
 }
 
-void Playlist::remove(int index){
-	if(list[index].queue_index >= 0)
-		toggleQueue(index);
-	if(list[index].stopafter)
-		stopAfter(index);
-	list.erase(list.begin() + index);
-	correctList(index, -1);
-}
-
 void Playlist::remove(Tune &tune){
+	list_t::iterator iter;
+	play_queue_t::iterator queue_iter;
+	uint32_t index;
 	if(tune.queue_index >= 0)
 		toggleQueue(tune);
 	if(tune.stopafter)
 		stopAfter(tune);
-	list.erase(list.begin() + tune.index);
+
+	index = tune.index;
+
+	// Adjust the index of the track to stop after
+	if(stopafter > index)
+		stopafter -= 1;
+
+	// Adjust the indices of play queue pointers for items after this
+	for(queue_iter = play_queue.begin(); queue_iter != play_queue.end(); queue_iter++){
+		if((*queue_iter) > index)
+			*queue_iter -= 1;
+	}
+
+	// Adjust the indices of all following tracks
+	for(iter = list.begin() + index + 1; iter != list.end(); iter++){
+		(*iter).index -= 1;
+	}
+
+	list.erase(list.begin() + index);
+
 }
 
 void Playlist::correctList(int start, int change){

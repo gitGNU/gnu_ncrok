@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -17,12 +17,36 @@
  *   Free Software Foundation, Inc.,                                       *
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
-#ifndef _UTIL_H
-#define _UTIL_H
 
-#include <sys/types.h>
+#ifndef __HELPWINDOW_H_
+#define __HELPWINDOW_H_
 
-size_t strcopy( char *dst, const char *src, size_t length );
-int max( int a, int b );
-int min( int a, int b );
+#include <deque>
+
+#include "window.h"
+
+class HelpWindow : public Window {
+public:
+    HelpWindow();
+    void scrollUp();
+    void scrollDown();
+
+    void show();
+
+    void display(int screenCols, int screenRows);
+    void redraw(int screenCols, int screenRows);
+private:
+
+
+    void shapeText();
+
+    std::deque<std::string> lines;
+    int first_line;
+
+    static size_t extract_line(const std::string &str, size_t start, size_t len, std::string &out, bool &eol);
+
+    static const size_t continuation_indent = 5;
+    static const std::string text;
+};
+
 #endif

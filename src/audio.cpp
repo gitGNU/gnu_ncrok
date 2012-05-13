@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -143,7 +143,6 @@ bool Audio::updateTime(){
 		return false;
 	}
 	failupdates = 0;
-	pthread_mutex_lock(&Ncrok::app.display_mutex);
 	if (gst_element_query_position (pipeline, &fmt, &pos)) {
 		char *posstr;
 		posstr = (char*)malloc(16);
@@ -151,7 +150,6 @@ bool Audio::updateTime(){
 		double rel = (double)pos / (double)len;
 		Ncrok::app.updateTime(posstr, rel);
 	}
-	pthread_mutex_unlock(&Ncrok::app.display_mutex);
 	return true;
 }
 

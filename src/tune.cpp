@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -28,7 +28,6 @@
 #include "audio.h"
 #include "window.h"
 #include "tune.h"
-#include "util.h"
 
 Tune::Tune(const std::string &name) :
 	filename(name)
@@ -106,8 +105,7 @@ ITEM *Tune::getItem(){
 		if(queue_index > 8)
 			sprintf(item_text,"%d %s",queue_index+1, displayName.c_str());
 		else sprintf(item_text,"%d  %s",queue_index+1, displayName.c_str());
-	}
-	else {
+	} else {
 		strcpy(item_text + 3, displayName.c_str());
 	}
 	if(stopafter) item_text[2] = '*';

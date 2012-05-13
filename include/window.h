@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -17,6 +17,7 @@
  *   Free Software Foundation, Inc.,                                       *
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
+
 #ifndef _WINDOW_H
 #define _WINDOW_H
 #include <ncurses.h>
@@ -27,46 +28,49 @@
 
 
 class Window{
-	public:
-		typedef enum {
-			SCROLL_UP,
-			SCROLL_DN
-		} scroll_dir_t;
+public:
+	Window();
+	virtual ~Window();
 
-		Window(int xx, int yy, int ww, int hh);
-		Window();
-		~Window();
+	void init(int x, int y, int w, int h);
+	void initCenter(int x, int y, int w, int h);
 
-		void setDims(int x, int y, int w, int h);
-		void setDimsFromCenter(int x, int y, int w, int h);
+	void resize(int x, int y, int w, int h);
+	void resizeCenter(int x, int y, int w, int h);
 
-		void getDims(int* xx, int* yy, int* ww, int* hh);
-		int getHeight();
-		int getWidth();
-		MENU* addMenu(ITEM** items);
-		WINDOW* getWindow();
-		PANEL* getPanel();
-		MENU*	getMenu();
-		void pointPanelTo(Window* win);
-		void printTitle(const std::string &ntitle);
-		void printCentered(const std::string &text, int y);
-		void refresh();
-		void hide();
-		void show();
-		void reBox();
-		void clear();
-		void touch();
-		void reDraw();
-		void setScrollable(bool s){scrollok(window, s);}
-		void doScroll(scroll_dir_t dir);
+	int getHeight(){return h;}
+	int getWidth(){return w;}
+	MENU* addMenu(ITEM** items);
+	WINDOW* getWindow(){return window;}
+	//PANEL* getPanel(){return panel;}
+	MENU*	getMenu(){return menu;}
+	//void pointPanelTo(Window* win);
+	void printTitle(const std::string &ntitle);
+	void printCentered(const std::string &text, int y);
 
-	private:
-		std::string title;
-		MENU* menu;
-		int x, y, w, h;
-		WINDOW* window;
-		PANEL* panel;
-		void init();
+	void hide();
+	virtual void show();
+	void reBox();
+	void clear();
+	void touch();
+	void setPanelTop(){top_panel(panel);}
+
+	void setScrollable(bool s){scrollok(window, s);}
+
+	virtual void display(int screenCols, int screenRows);
+	virtual void redraw(int screenCols, int screenRows) = 0;
+
+	size_t innerWidth() const {return w - 2;}
+	size_t innerHeight() const {return h - 2;}
+
+protected:
+	void init();
+
+	std::string title;
+	MENU* menu;
+	int x, y, w, h;
+	WINDOW* window;
+	PANEL* panel;
 };
 
 #endif

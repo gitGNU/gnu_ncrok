@@ -1,5 +1,5 @@
 /***************************************************************************
- *   Copyright (C) 2008-2011 by Ben Nahill                                      *
+ *   Copyright (C) 2008-2012 by Ben Nahill                                 *
  *   bnahill@gmail.com                                                     *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -36,20 +36,19 @@
 
 #include "ncrok.h"
 #include "audio.h"
-#include "tune.h"
-#include "playlist.h"
-#include "window.h"
 
 Ncrok Ncrok::app;
 static void resizeWin(int ignore);
 
-inline static Tune *tune_from_item(const ITEM *item){return (Tune *)item_userptr(item);}
+inline static Tune *tune_from_item(const ITEM *item){
+	return (Tune *)item_userptr(item);
+}
 
 /*
  * Run everything!
  */
 int main(int argc, char **argv){
-	FILE *hidestderr = freopen ("/dev/null","w",stderr);
+	FILE *_ = freopen ("/dev/null","w",stderr);
 	int count = 0;
 
 	if(argc > 1){
@@ -68,20 +67,30 @@ int main(int argc, char **argv){
 Ncrok::Ncrok(){
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
+\
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+
+	pthread_mutex_init(&display_mutex, &attr);
 
 	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) throw std::exception();
 
 	numRows = ws.ws_row;
 	numCols = ws.ws_col;
+
+
+	windows.push_back(&right);
+	windows.push_back(&bottom);
 }
 
 Ncrok::~Ncrok(){
 	printf("\033]0;%s\007", "");
 	audio.close();
 	endwin();
+	pthread_mutexattr_destroy(&attr);
 }
 
-int Ncrok::initialize(int tracks){
+void Ncrok::initialize(int tracks){
 	(void) signal(SIGWINCH, resizeWin);
 	initscr();
 	char title[16];
@@ -90,22 +99,19 @@ int Ncrok::initialize(int tracks){
 	noecho();
 	cbreak();
 	keypad(stdscr, true);
+	intrflush(stdscr, FALSE);
 	curs_set(0);
 
-	pthread_mutex_init(&display_mutex, NULL);
-
-	initWindows();
-
-	//box(stdscr,0,0);
-	update_panels();
-
-	doupdate();
 	sprintf(title, "%d Tracks",tracks);
-	right.printTitle(title);
 
 	audio.init();
-	bottom.printTitle(TITLE_STRING);
-	return 0;
+
+	right.display(numCols, numRows);
+	right.setPanelTop();
+	right.printTitle(title);
+	bottom.display(numCols, numRows);
+
+	updatePanels();
 }
 
 void Ncrok::runPlaylist(){
@@ -115,8 +121,6 @@ void Ncrok::runPlaylist(){
 	char ch;
 	ITEM *cur;
 
-	activewin = &right;
-
 	if(playlist.size() == 0){
 		sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
 
@@ -124,58 +128,51 @@ void Ncrok::runPlaylist(){
 			sprintf(longtmp2, "Playlist Loaded - %d files", tmp);
 			right.printTitle(longtmp2);
 		}
-
 	}
 	playlist.sort();
 	keypad(right.getWindow(), TRUE);
 
-	int x, y, w, h;
-	right.getDims(&x,&y,&w,&h);
-
-	playmenu = playlist.getMenu();
-
-	set_menu_win(playmenu, right.getWindow());
-
-	set_menu_sub(playmenu, derwin(right.getWindow(), h-2, w-2, 1, 1));
-	set_menu_format(playmenu, h-2, 1);
-	set_menu_mark(playmenu, 0);
-	post_menu(playmenu);
-	right.refresh();
+	right.assignMenu(playlist.getMenu());
 
 	while((ch = wgetch(right.getWindow())) != IN_QUIT){
-		pthread_mutex_lock(&display_mutex);
 		switch(ch){
 			case IN_HELP1:
 			case IN_HELP2:
 				showHelpWindow();
 				break;
 			case IN_SAVE:
-				sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
+				sprintf(longtmp,"%s/.ncroklst", getenv("HOME"));
 				if((tmp = playlist.save(longtmp)) <= 0) break;
 				sprintf(longtmp2, "Playlist Saved - %s - %d files", longtmp, tmp);
+				lockDisplay();
 				right.printTitle(longtmp2);
+				unlockDisplay();
 				break;
 			case IN_LOAD:
 				sprintf(longtmp,"%s/.ncroklst",getenv("HOME"));
 				if((tmp = playlist.load(longtmp)) <= 0)
 					break;
 				sprintf(longtmp2, "Playlist Loaded - %d files", tmp);
+				lockDisplay();
 				right.printTitle(longtmp2);
 				refreshPlaylist();
+				unlockDisplay();
 				break;
 			case IN_DOWN:
-				menu_driver(playmenu, REQ_DOWN_ITEM);
+				right.scrollDown(1);
+				updatePanels();
 				break;
 			case IN_UP:
-				menu_driver(playmenu, REQ_UP_ITEM);
+				right.scrollUp(1);
+				updatePanels();
 				break;
 			case IN_PUP:
-				for(tmp = 0; tmp < h - 2; tmp++)
-					menu_driver(playmenu, REQ_UP_ITEM);
+				right.scrollUp(right.innerHeight());
+				updatePanels();
 				break;
 			case IN_PDOWN:
-				for(tmp = 0; tmp < h - 2; tmp++)
-					menu_driver(playmenu, REQ_DOWN_ITEM);
+				right.scrollDown(right.innerHeight());
+				updatePanels();
 				break;
 			case IN_OPEN:
 				addDir();
@@ -186,48 +183,28 @@ void Ncrok::runPlaylist(){
 				bottom.printCentered("                       ",1);
 				if(!audio.playPause())
 					bottom.printCentered("PAUSED",1);
-				//Pause/play
 				break;
 			case IN_REMOVE:
 				//remove item
 				break;
 			case IN_NEXT:
-				if(item_count(playmenu) == 0) break;
+				if(right.itemCount() == 0) break;
 				nextTrack();
 				break;
 			case IN_PREV:
-				if(item_count(playmenu) == 0) break;
+				if(right.itemCount() == 0) break;
 				prevTrack();
 				break;
 			case IN_STOP:
 				if(activetrack == NULL) break;
-				audio.stop();
-				bottom.printTitle("");
-				bottom.clear();
-				bottom.printCentered("STOPPED",1);
+				stop();
 				break;
 			case IN_PLAY:
-				if(item_count(playmenu) == 0) break;
+				if(right.itemCount() == 0) break;
 				playSelected();
 				break;
 			case IN_JUMP:
-				cur = current_item(playmenu);
-				if(playlist.queueSize() > 0){
-					int *queue = playlist.getQueue();
-					int currqueue = tune_from_item(cur)->queue_index;
-					if(tune_from_item(cur)->index == playlist.currIndex){
-						jumpToIndex(queue[0]);
-						break;
-					}
-					else if(currqueue >= 0){
-						if(playlist.queueSize() > currqueue + 1){
-							jumpToIndex(queue[currqueue + 1]);
-							break;
-						}
-					}
-
-				}
-				jumpToIndex(playlist.currIndex);
+				doJumpAction();
 				break;
 			case IN_FWD_FINE:
 				audio.seekFine(Audio::DIR_FORWARD); break;
@@ -238,33 +215,23 @@ void Ncrok::runPlaylist(){
 			case IN_BACK_COARSE:
 				audio.seekCoarse(Audio::DIR_BACKWARD); break;
 			case IN_SEARCH:
-				if(item_count(playmenu) == 0) break;
+				if(right.itemCount() == 0) break;
 				search();
 				break;
 			case IN_QUEUE:
-				if(item_count(playmenu) == 0) break;
-				cur = current_item(playmenu);
+				if(right.itemCount() == 0) break;
+				cur = right.getCurrentItem();
 				playlist.toggleQueue(*tune_from_item(cur));
 				updateQueueLabels();
 				break;
 			case IN_STOP_AFTER:
-				if(item_count(playmenu) == 0) break;
-				cur = current_item(playmenu);
+				if(right.itemCount() == 0) break;
+				cur = right.getCurrentItem();
 				playlist.stopAfter(*tune_from_item(cur));
 				updateQueueLabels();
 				break;
 			case IN_DELETE:
-				if(item_count(playmenu) == 0) break;
-				cur = current_item(playmenu);
-				if(tune_from_item(cur) == activetrack){
-					if(tmp > 0)
-						activetrack = playlist.activeTrack();
-				}
-				playlist.remove(tmp);
-				free_item(cur);
-				refreshPlaylist();
-				jumpToIndex(tmp);
-				right.printTitle("1 File Deleted");
+				deleteSelected();
 				break;
 			case IN_SEARCH_START:
 				findByFirst();
@@ -277,38 +244,65 @@ void Ncrok::runPlaylist(){
 				//bottom.printCentered(longtmp,1);
 				break;
 		}
-		right.refresh();
-		pthread_mutex_unlock(&display_mutex);
+		updatePanels();
 	}
 }
 
+void Ncrok::doJumpAction(){
+	const Playlist::play_queue_t &queue = playlist.getQueue();
+	Tune *tune;
+	int currqueue;
+	if(queue.size() > 0){
+		tune = tune_from_item(right.getCurrentItem());
+		// Check to see if the current item is in the queue
+		currqueue = tune->queue_index;
+		if(tune->index == playlist.currIndex){
+			// On currently playing item, jump to first in queue
+			jumpToIndex(queue[0]);
+			return;
+		} else if(currqueue >= 0){
+			if(queue.size() > currqueue + 1){
+				// Currently looking at a queued item, go to the next
+				jumpToIndex(queue[currqueue + 1]);
+				return;
+			}
+		}
+
+	}
+	// By default just go to the current track
+	jumpToIndex(playlist.currIndex);
+}
+
 void Ncrok::playSelected(){
-	if(playlist.size() == 0) return;
 	ITEM *cur;
+	if(playlist.size() == 0) return;
+
 	bottom.printCentered("                       ",1);
-	cur = current_item(playmenu);
+	cur = right.getCurrentItem();
 	activetrack = tune_from_item(cur);
 	bottom.printTitle(activetrack->getMenuText());
 	playlist.play(*activetrack);
-	pos_menu_cursor(playmenu);
+	right.posCursor();
 }
 
 void Ncrok::showHelpWindow(){
 	char ch;
-	Window helpWindow;
+	HelpWindow helpWindow;
 	bool get_out = false;
 
-	helpWindow.setDimsFromCenter(numCols/2, numRows/2, 25, 20);
-	helpWindow.printCentered("Apples", 0);
-	helpWindow.printCentered("Turkey", 1);
-	helpWindow.printCentered("Tuna", 23);
-	helpWindow.setScrollable(true);
+	lockDisplay();
 
-	helpWindow.show();
-	pthread_mutex_unlock(&display_mutex);
+	windows.push_back(&helpWindow);
+
+	helpWindow.display(numCols, numRows);
+
+	helpWindow.setPanelTop();
+
+	updatePanels();
+
+	unlockDisplay();
 
 	while(!get_out && ((ch = wgetch(right.getWindow())) != IN_QUIT)){
-		pthread_mutex_lock(&display_mutex);
 		switch(ch){
 		case IN_HELP1:
 		case IN_HELP2:
@@ -316,43 +310,28 @@ void Ncrok::showHelpWindow(){
 			get_out = true;
 			break;
 		case IN_UP:
-			helpWindow.doScroll(Window::SCROLL_UP);
-			helpWindow.refresh();
+			helpWindow.scrollUp();
+			updatePanels();
 			break;
 		case IN_DOWN:
-			helpWindow.doScroll(Window::SCROLL_DN);
-			helpWindow.refresh();
+			helpWindow.scrollDown();
+			updatePanels();
+			break;
+		default:
 			break;
 		}
-		pthread_mutex_unlock(&display_mutex);
 	}
-	pthread_mutex_lock(&display_mutex);
+
+	lockDisplay();
+	windows.pop_back();
+
 	right.reBox();
 	bottom.reBox();
-	right.refresh();
-	left.refresh();
-	pthread_mutex_unlock(&display_mutex);
-}
+	right.setPanelTop();
 
-void Ncrok::initWindows(){
-	int w, h;
-	getmaxyx(stdscr, h, w);
-	//mvprintw(10, 10, "%u, %u, %u, %u\n", h-4, w-20, 0, 20);
+	updatePanels();
 
-	/*left.setDims(0, 0, 20, h);
-	right.setDims(20, 0, w-20, h-4);
-	bottom.setDims(20, h-4, w-20, 4);*/
-
-	right.setDims(0, 0, w, h-5);
-	bottom.setDims(0, h-5, w, 5);
-
-	//Set cycle order
-	//left.pointPanelTo(&right);
-	right.pointPanelTo(&bottom);
-	bottom.pointPanelTo(&left);
-
-	//left.printTitle("Artists");
-	right.printTitle("Playlist");
+	unlockDisplay();
 }
 
 /*
@@ -367,11 +346,8 @@ void Ncrok::addDir(){
 	int count;
 	sprintf(out,"Open:");
 	right.printCentered(out, right.getHeight() - 1);
-	pthread_mutex_unlock(&display_mutex);
+
 	while((ch = wgetch(right.getWindow())) != IN_ESC){
-		pthread_mutex_lock(&display_mutex);
-		right.reBox();
-		right.refresh();
 		switch(ch){
 			case IN_BELL:
 			case IN_DELETE:
@@ -405,26 +381,33 @@ void Ncrok::addDir(){
 		if(get_out) break;
 		sprintf(out, "Open: %s",qstring);
 		right.printCentered(out,right.getHeight() - 1);
-		doupdate();
-		// Unlock only if looping
-		pthread_mutex_unlock(&display_mutex);
+		updatePanels();
 	}
 	right.reBox();
+	updatePanels();
+}
+
+void Ncrok::deleteSelected(){
+	Tune *tune;
+	ITEM *item;
+	uint32_t index;
+	if(right.itemCount() == 0) return;
+	item = right.getCurrentItem();
+	tune = tune_from_item(item);
+	if(tune == activetrack){
+		activetrack = playlist.activeTrack();
+	}
+	index = tune->index;
+	playlist.remove(*tune);
+	free_item(item);
+	refreshPlaylist();
+	jumpToIndex(index);
+	right.printTitle("1 File Deleted");
 }
 
 void Ncrok::refreshPlaylist(){
-	if(playmenu != NULL){
-		free_menu(playmenu);
-	}
-	playmenu = playlist.getMenu();
-	set_menu_win(playmenu, right.getWindow());
-	int x, y, w, h;
-	right.getDims(&x,&y,&w,&h);
+	right.assignMenu(playlist.getMenu());
 
-	set_menu_sub(playmenu, derwin(right.getWindow(), h-2, w-2, 1, 1));
-	set_menu_format(playmenu, h-2, 1);
-	set_menu_mark(playmenu, 0);
-	post_menu(playmenu);
 	jumpToIndex(0);
 }
 
@@ -437,12 +420,9 @@ void Ncrok::findByFirst(){
 	bool get_out = false;
 	sprintf(out,"Jump:");
 	right.printCentered(out, right.getHeight() - 1);
-	pthread_mutex_unlock(&display_mutex);
 
 	while((ch = wgetch(right.getWindow())) != IN_ESC && !get_out){
-		pthread_mutex_lock(&display_mutex);
-		right.reBox();
-		right.refresh();
+
 		switch(ch){
 			case IN_BELL:
 			case IN_DELETE:
@@ -468,6 +448,7 @@ void Ncrok::findByFirst(){
 				} get_out = true;
 		}
 		if(get_out) break;
+		right.reBox();
 		sprintf(out, "Jump: %s",qstring);
 		right.printCentered(out,right.getHeight() - 1);
 		if(len > 0){
@@ -476,10 +457,10 @@ void Ncrok::findByFirst(){
 				jumpToIndex(index);
 			}
 		}
-		doupdate();
-		pthread_mutex_unlock(&display_mutex);
+		updatePanels();
 	}
 	right.reBox();
+	updatePanels();
 }
 
 void Ncrok::search(){
@@ -492,15 +473,14 @@ void Ncrok::search(){
 	bool get_out = false;
 	bool search_again;
 	sprintf(out,"Search:");
-	//debug output
-	char test[10];
+
 	right.printCentered(out, right.getHeight() - 1);
-	pthread_mutex_unlock(&display_mutex);
+
+	updatePanels();
+
 	while((ch = wgetch(right.getWindow())) != IN_ESC){
-		pthread_mutex_lock(&display_mutex);
 		search_again = true;
-		right.reBox();
-		right.refresh();
+
 		//Debug keys
 		//sprintf(test,"%u",ch);
 		//right.printTitle(test);
@@ -512,7 +492,7 @@ void Ncrok::search(){
 				if(len > 0){
 					playlist.clearSearch();
 					qstring[--len] = 0;
-
+					right.reBox();
 				}
 				else get_out = true;
 				break;
@@ -545,9 +525,8 @@ void Ncrok::search(){
 		if(get_out) break;
 		sprintf(out, "Search: %s",qstring);
 		right.printCentered(out,right.getHeight() - 1);
+		updatePanels();
 		if(!search_again){
-			doupdate();
-			pthread_mutex_unlock(&display_mutex);
 			continue;
 		}
 		if(len > 0){
@@ -556,29 +535,40 @@ void Ncrok::search(){
 				jumpToIndex(index);
 			}
 		}
-		doupdate();
-		pthread_mutex_unlock(&display_mutex);
+		updatePanels();
 	}
-	right.reBox();
+
 	playlist.clearSearch();
+	right.reBox();
+	updatePanels();
+}
+
+void Ncrok::stop(){
+	audio.stop();
+	bottom.printTitle("");
+	bottom.clear();
+	updatePanels();
+	bottom.printCentered("STOPPED",1);
 }
 
 void Ncrok::jumpToIndex(int index){
-	ITEM **items = menu_items(playmenu);
-	set_current_item(playmenu, items[index]);
+	ITEM **items = right.getItems();
+
+	right.setItem(items[index]);
 	if(index > 0){
-		menu_driver(playmenu, REQ_UP_ITEM);
-		menu_driver(playmenu, REQ_DOWN_ITEM);
+		right.scrollUp(1);
+		right.scrollDown(1);
+		updatePanels();
 	}
 }
 
 void Ncrok::updateQueueLabels(){
-	ITEM *index = current_item(playmenu);
-	ITEM **items = menu_items(playmenu);
-	int *queue = playlist.getQueue();
-	int size = playlist.queueSize();
-	for(int i = 0; i < size; i++){
-		playlist[queue[i]]->updateItem(items[queue[i]]);
+	ITEM *index = right.getCurrentItem();
+	ITEM **items = right.getItems();
+	const Playlist::play_queue_t &queue = playlist.getQueue();
+	Playlist::play_queue_t::const_iterator i;
+	for(i = queue.begin(); i != queue.end(); i++){
+		playlist[i[0]]->updateItem(items[*i]);
 	}
 	if(playlist.dequeued >= 0){ //update dequeued
 		playlist[playlist.dequeued]->updateItem(items[playlist.dequeued]);
@@ -590,21 +580,27 @@ void Ncrok::updateQueueLabels(){
 	if(playlist.prevstopafter >= 0){
 		playlist[playlist.prevstopafter]->updateItem(items[playlist.prevstopafter]);
 	}
-	free(queue);
 
-	unpost_menu(playmenu);
-	post_menu(playmenu);
-	set_current_item(playmenu, index);
-	right.refresh();
-	pos_menu_cursor(playmenu);
+	right.unpost();
+	right.post();
+	right.setItem(index);
+
+	right.posCursor();
+
+	updatePanels();
 }
 
 void Ncrok::updateTime(char* pos, double rel){
 	char buf[64];
 	sprintf(buf,"%s / %s",pos, length);
+	lockDisplay();
+
 	bottom.printCentered(buf,3);
-	//bottom.printCentered("Tuna",3);
 	drawProgress(rel);
+
+	updatePanels();
+
+	unlockDisplay();
 }
 
 void Ncrok::setLength(char *len){
@@ -618,7 +614,10 @@ void Ncrok::nextTrack(){
 		bottom.printTitle(activetrack->getMenuText());
 		playlist.play();
 	}
-	else bottom.reBox();
+	else {
+		stop();
+		bottom.reBox();
+	}
 	updateQueueLabels();
 }
 
@@ -631,6 +630,12 @@ void Ncrok::prevTrack(){
 	}
 }
 
+void Ncrok::updatePanels(){
+	lockDisplay();
+	update_panels();
+	doupdate();
+	unlockDisplay();
+}
 
 //This function is called by another thread!
 void Ncrok::drawProgress(double progress){
@@ -647,7 +652,7 @@ void Ncrok::drawProgress(double progress){
 			str[i+1] = '>';
 		else str[i+1] = '-';
 	}
-	//sprintf(str,"%f",progress);
+
 	bottom.printCentered(str,2);
 }
 
@@ -655,16 +660,18 @@ void Ncrok::drawProgress(double progress){
  * Redraw everything. Go corrupted data
  */
 void Ncrok::reDraw(){
+	updatePanels();
 	redrawwin(stdscr);
 }
 
 
 void Ncrok::resizeTerm(){
+	std::deque<Window *>::iterator win_iter;
 	//Get the window size directly
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
 
-	pthread_mutex_lock(&display_mutex);
+	lockDisplay();
 
 	if(ioctl(fd,TIOCGWINSZ,&ws)!=0) return;
 
@@ -673,23 +680,13 @@ void Ncrok::resizeTerm(){
 	numRows = ws.ws_row;
 	numCols = ws.ws_col;
 
-	right.setDims(0, 0, numRows, ws.ws_row - 5);
-	bottom.setDims(0, ws.ws_row - 5, ws.ws_col, 5);
+	for(win_iter = windows.begin(); win_iter != windows.end(); win_iter++){
+		(*win_iter)->redraw(numCols, numRows);
+	}
 
-	int x, y, w, h;
-	right.getDims(&x,&y,&w,&h);
+	updatePanels();
 
-	unpost_menu(playmenu);
-	set_menu_sub(playmenu, derwin(right.getWindow(), h-2, w-2, 1, 1));
-	set_menu_format(playmenu, h-2, 1);
-	set_menu_mark(playmenu, 0);
-	keypad(right.getWindow(), TRUE);
-	post_menu(playmenu);
-
-	update_panels();
-	refresh();
-	doupdate();
-	pthread_mutex_unlock(&display_mutex);
+	unlockDisplay();
 }
 
 static void resizeWin(int){
