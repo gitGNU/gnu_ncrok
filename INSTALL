@@ -1,12 +1,10 @@
 Install procedure requires Cmake (http://www.cmake.org)
-Once obtained, run the following from this directory:
-	$ cmake .
+Once obtained, create a subdirectory 'build':
+	$ cd build
+	$ cmake ..
 	$ make
-	# make install		##Optional -- can just use 'ncrok' exec
+	# make install
 The program can then be run as 'ncrok'
-
-Plan B:
-run ./build. It won't check any dependencies. Crappy.
 
 Dependencies - dev and runtime packages for all:
 	taglib
