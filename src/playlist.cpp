@@ -130,6 +130,7 @@ int Playlist::readDir(const std::string &path){
 		getCwd(dirPath);
 		//if(*(dirPath.end() - 1) != '/')
 		//	dirPath.append('/', 1);
+		dirPath.append(1, '/');
 		dirPath.append(path);
 	} else {
 		dirPath.assign(path);
