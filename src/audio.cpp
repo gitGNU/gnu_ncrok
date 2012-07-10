@@ -21,6 +21,7 @@
 #include <gst/gst.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "audio.h"
 #include "ncrok.h"

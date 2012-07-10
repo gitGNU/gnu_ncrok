@@ -29,6 +29,7 @@
 #include <regex.h>
 #include <string>
 #include <iostream>
+#include <unistd.h>
 
 #include "playlist.h"
 #include "tune.h"
