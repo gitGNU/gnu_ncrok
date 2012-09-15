@@ -87,8 +87,10 @@ Tune *Playlist::nextTrack(){
 		decrementQueue(0);
 		return &list[currIndex];
 	}
-	if(currIndex == list.size() - 1)
+	if(currIndex == list.size() - 1){
 		currIndex = 0; //then increment
+		return &list[currIndex];
+	}
 	return &list[++currIndex];
 }
 
