@@ -33,14 +33,7 @@ public:
     int itemCount(){return item_count(menu);}
     ITEM *getCurrentItem(){return current_item(menu);}
     void posCursor(){pos_menu_cursor(menu);}
-    void setItem(ITEM *item){
-		int ind;
-		ind = item_index(item);
-		if(ind > h){
-			set_top_row(menu, std::max(ind - h/2, 0));
-		}
-		set_current_item(menu, item);
-	}
+    void setItem(ITEM *item);
     ITEM **getItems(){return menu_items(menu);}
     void unpost(){unpost_menu(menu);}
     void post(){post_menu(menu);}

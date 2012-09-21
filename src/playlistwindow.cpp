@@ -70,6 +70,14 @@ void PlaylistWindow::assignMenu(MENU *m){
 	post_menu(menu);
 }
 
+void PlaylistWindow::setItem(ITEM *item){
+	int ind = item_index(item);
+	if((ind - top_row(menu)) > h){
+		set_top_row(menu, std::max(ind - h/2, 0));
+	}
+	set_current_item(menu, item);
+}
+
 void PlaylistWindow::scrollDown(int count){
 	while(count--){
 		menu_driver(menu, REQ_DOWN_ITEM);
