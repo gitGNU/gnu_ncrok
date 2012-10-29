@@ -27,7 +27,7 @@
 #include "helpwindow.h"
 #include "playlist.h"
 
-#include <ncurses.h>
+#include <ncursesw/ncurses.h>
 #include <form.h>
 #include <pthread.h>
 #include <deque>

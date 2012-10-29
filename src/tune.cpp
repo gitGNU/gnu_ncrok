@@ -29,6 +29,12 @@
 #include "window.h"
 #include "tune.h"
 
+#include <fstream>
+
+
+static bool compare_i(char a, char b);
+static void cleanString(std::string &in, int maxlen);
+
 Tune::Tune(const std::string &name) :
 	filename(name)
 {
@@ -149,29 +155,22 @@ bool Tune::query(regex_t **terms) const{
 }
 
 void Tune::parseFile(){
-	//Use a big buffer to cut down the size of the text copied
-	char buffer[1024];
 	TagLib::FileRef f(filename.c_str());
 
 	if(f.tag()->isEmpty()) {
 		guessFile();
 		return;
 	}
-	TagLib::String tmp = f.tag()->artist();
-	strcpy(buffer,tmp.toCString());
-	cleanString(buffer, TUNE_LEN_ARTIST);
-	artist.assign(buffer);
+	
+	artist.assign(f.tag()->artist().to8Bit());
+	cleanString(artist, TUNE_LEN_ARTIST);
 
 	if(artist.length() != 0){ //Do the rest
-		tmp = f.tag()->album();
-		strcpy(buffer,tmp.toCString());
-		cleanString(buffer, TUNE_LEN_ALBUM);
-		album.assign(buffer);
+		album.assign(f.tag()->album().to8Bit());
+		cleanString(album, TUNE_LEN_ALBUM);
 
-		tmp = f.tag()->title();
-		strcpy(buffer,tmp.toCString());
-		cleanString(buffer, TUNE_LEN_TITLE);
-		title.assign(buffer);
+		title.assign(f.tag()->title().to8Bit());
+		cleanString(title, TUNE_LEN_TITLE);
 
 		track = f.tag()->track();
 		year = f.tag()->year();
@@ -179,12 +178,13 @@ void Tune::parseFile(){
 }
 
 void Tune::guessFile(){
-	char buffer[512];
+	//char buffer[512];
 	size_t last_slash = filename.find_last_of('/');
 	if(last_slash != std::string::npos){
-		strcpy(buffer, filename.c_str() + last_slash + 1);
-		cleanString(buffer, TUNE_LEN_TITLE);
-		title.assign(buffer);
+		//strcpy(buffer, filename.c_str() + last_slash + 1);
+		
+		title.assign(filename.substr(last_slash + 1));
+		//cleanString(title, TUNE_LEN_TITLE);
 	}
 }
 
@@ -223,19 +223,8 @@ static bool compare_i(char a, char b){
 	return false;
 }
 
-static void cleanString(char *in, int maxlen){
-	int i;
-	for(i = 0; i < maxlen; i++){
-		if(*in > 31 && *in < 127){
-			in++;
-			continue;
-		}
-		if(*in == 0)
-			break;
-		if(i == maxlen - 1){
-			*in = 0;
-			break;
-		}
-		*(in++) = '_';
+static void cleanString(std::string &s, int maxlen){
+	if(s.size() > maxlen){
+		s.resize(maxlen);
 	}
 }

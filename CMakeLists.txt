@@ -26,7 +26,7 @@ add_definitions(-O2 -D_REENTRANT)
 set(CMAKE_EXE_LINKER_FLAGS "-flto")
 
 add_executable(ncrok ${SOURCES})
-target_link_libraries(ncrok pthread  ${GST_LIBRARIES} ${TAG_LIBRARIES} menu panel ncurses)
+target_link_libraries(ncrok pthread  ${GST_LIBRARIES} ${TAG_LIBRARIES} menuw panelw ncursesw)
 
 install(TARGETS ncrok
 	RUNTIME DESTINATION bin

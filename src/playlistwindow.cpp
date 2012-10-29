@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "playlistwindow.h"
+#include <cmath>
 
 PlaylistWindow::PlaylistWindow() :
 	Window(),
@@ -72,7 +73,13 @@ void PlaylistWindow::assignMenu(MENU *m){
 
 void PlaylistWindow::setItem(ITEM *item){
 	int ind = item_index(item);
-	if((ind - top_row(menu)) > h){
+	if(menu->nitems - ind < h){
+		// Item is on last possible page
+		// Jump to the last possible page
+		set_top_row(menu, std::max(0, menu->nitems - h));
+	} else if(std::abs(ind - top_row(menu)) > h){
+		// Item is not on current page
+		// Jump to have it centered
 		set_top_row(menu, std::max(ind - h/2, 0));
 	}
 	set_current_item(menu, item);

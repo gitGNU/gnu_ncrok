@@ -22,17 +22,18 @@
  * ncrok.cpp - Contains the UI for the application
  */
 
-#include <ncurses.h>
-#include <panel.h>
+#include <ncursesw/ncurses.h>
+#include <ncursesw/panel.h>
 #include <string.h>
 #include <signal.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <menu.h>
+#include <ncursesw/menu.h>
 #include <form.h>
 #include <stdlib.h>
+#include <locale.h>
 
 #include "ncrok.h"
 #include "audio.h"
@@ -40,7 +41,7 @@
 Ncrok Ncrok::app;
 static void resizeWin(int ignore);
 
-inline static Tune *tune_from_item(const ITEM *item){
+extern inline Tune *tune_from_item(const ITEM *item){
 	return (Tune *)item_userptr(item);
 }
 
@@ -49,6 +50,7 @@ inline static Tune *tune_from_item(const ITEM *item){
  */
 int main(int argc, char **argv){
 	FILE *_ = freopen ("/dev/null","w",stderr);
+	setlocale(LC_ALL, "");
 	int count = 0;
 
 	if(argc > 1){
@@ -67,7 +69,7 @@ int main(int argc, char **argv){
 Ncrok::Ncrok(){
 	struct winsize ws;
 	int fd = open("/dev/tty", O_RDWR);
-\
+
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 
@@ -95,10 +97,10 @@ void Ncrok::initialize(int tracks){
 	initscr();
 	char title[16];
 
-	//raw();
+	raw();
 	noecho();
 	cbreak();
-	keypad(stdscr, true);
+	keypad(stdscr, false);
 	intrflush(stdscr, FALSE);
 	curs_set(0);
 

@@ -34,6 +34,20 @@
 #include "playlist.h"
 #include "tune.h"
 
+#include <fstream>
+
+class outfile{
+public:
+	outfile(){
+		s.open("test", std::ios_base::trunc);
+	}
+	~outfile(){
+		s.close();
+	}
+	std::ofstream s;
+};
+
+static outfile debug;
 
 Playlist::Playlist(){
 	currIndex=0;
@@ -110,6 +124,7 @@ MENU *Playlist::getMenu(){
 	for(list_t::iterator iter = list.begin(); iter != list.end(); iter++){
 		items[count] = (*iter).getItem();
 		(*iter).index = count;
+		debug.s << items[count]->name.str;
 		set_item_userptr(items[count++], &(*iter));
 	}
 	items[list.size()] = NULL;
@@ -145,7 +160,7 @@ int Playlist::readDir(const std::string &path){
 	if((dir = opendir(dirPath.c_str())) == NULL) return 0;
 
 	while((dit = readdir(dir)) != NULL){
-		if(dit->d_name[0] != '.'){//Eliminate hidden dirs and other pointers
+		if(dit->d_name[0] != '.'){ //Eliminate hidden dirs and other pointers
 			subPath.clear();
 			subPath.assign(dirPath);
 			subPath.append(1, '/');

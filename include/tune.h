@@ -78,15 +78,7 @@ class Tune {
 		std::string album;
 		std::string title;
 		std::string displayName;
-/*
-		char artist[TUNE_LEN_ARTIST];
-		char album[TUNE_LEN_ALBUM];
-		char title[TUNE_LEN_TITLE];
-		char displayName[TUNE_LEN_DISP];
-*/
+
 		uint32_t track, year;
 };
-
-static bool compare_i(char a, char b);
-static void cleanString(char *in, int maxlen);
 #endif
