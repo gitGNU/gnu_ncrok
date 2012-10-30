@@ -31,7 +31,6 @@
 
 #include <fstream>
 
-
 static bool compare_i(char a, char b);
 static void cleanString(std::string &in, int maxlen);
 
@@ -104,6 +103,8 @@ const std::string &Tune::getMenuText() const{
 }
 
 ITEM *Tune::getItem(){
+	ITEM * tmpitem;
+	uint_fast16_t i;
 	// To be freed by ncurses, which uses this space instead of copying it
 	char *item_text = (char *)malloc(TUNE_LEN_ITEM);
 	sprintf(item_text, "   ");
@@ -117,7 +118,21 @@ ITEM *Tune::getItem(){
 	if(stopafter) item_text[2] = '*';
 	item_text[TUNE_LEN_ITEM - 1] = 0;
 
-	return new_item(item_text,NULL);
+	tmpitem = new_item(item_text,NULL);
+	
+	// If new_item finds an unprintable character, go find it and replace it
+	if(!tmpitem){
+		for(i = strlen(item_text) - 1; i; i--){
+			if(!isprint(item_text[i])){
+				item_text[i] = '_';
+			}
+		}
+		
+		// Then create a new item that it will actually accept
+		tmpitem = new_item(item_text,NULL);
+	}
+	
+	return tmpitem;
 }
 
 void Tune::updateItem(ITEM *item){

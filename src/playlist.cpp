@@ -121,11 +121,18 @@ MENU *Playlist::getMenu(){
 	ITEM **items = (ITEM**)calloc(list.size()+1, sizeof(ITEM*));
 	char *tmp;
 	uint32_t count = 0;
-	for(list_t::iterator iter = list.begin(); iter != list.end(); iter++){
+	for(list_t::iterator iter = list.begin();
+	   iter != list.end();
+	   iter++, count++ ){
+
+		// Generate an ITEM
 		items[count] = (*iter).getItem();
+		
+		// Assign an index
 		(*iter).index = count;
-		debug.s << items[count]->name.str;
-		set_item_userptr(items[count++], &(*iter));
+		
+		// Point item to the Tune instance
+		set_item_userptr(items[count], &(*iter));
 	}
 	items[list.size()] = NULL;
 	playmenu = new_menu(items);

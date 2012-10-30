@@ -23,7 +23,7 @@ pkg_check_modules(NCURSES REQUIRED ncursesw menuw panelw)
 include_directories(include ${GST_INCLUDE_DIRS} ${TAG_INCLUDE_DIRS} ${NCURSES_INCLUDE_DIRS})
 link_directories(${GST_LIBRARY_DIRS} ${TAG_LIBRARY_DIRS} ${NCURSES_LIBRARY_DIRS})
 
-add_definitions(-O2 -D_REENTRANT -flto)
+add_definitions(-O2 -D_REENTRANT -flto -g)
 set(CMAKE_EXE_LINKER_FLAGS "-flto")
 
 add_executable(ncrok ${SOURCES})
