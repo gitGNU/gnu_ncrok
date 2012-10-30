@@ -22,15 +22,15 @@
  * ncrok.cpp - Contains the UI for the application
  */
 
-#include <ncursesw/ncurses.h>
-#include <ncursesw/panel.h>
+#include <ncurses.h>
+#include <panel.h>
 #include <string.h>
 #include <signal.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <ncursesw/menu.h>
+#include <menu.h>
 #include <form.h>
 #include <stdlib.h>
 #include <locale.h>

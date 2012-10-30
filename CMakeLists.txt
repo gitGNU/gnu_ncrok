@@ -18,15 +18,16 @@ set(SOURCES
 
 pkg_check_modules(GST REQUIRED gstreamer-0.10)
 pkg_check_modules(TAG REQUIRED taglib)
+pkg_check_modules(NCURSES REQUIRED ncursesw menuw panelw)
 
-include_directories(include ${GST_INCLUDE_DIRS} ${TAG_INCLUDE_DIRS})
-link_directories(${GST_LIBRARY_DIRS} ${TAG_LIBRARY_DIRS})
+include_directories(include ${GST_INCLUDE_DIRS} ${TAG_INCLUDE_DIRS} ${NCURSES_INCLUDE_DIRS})
+link_directories(${GST_LIBRARY_DIRS} ${TAG_LIBRARY_DIRS} ${NCURSES_LIBRARY_DIRS})
 
-add_definitions(-O2 -D_REENTRANT)
+add_definitions(-O2 -D_REENTRANT -flto)
 set(CMAKE_EXE_LINKER_FLAGS "-flto")
 
 add_executable(ncrok ${SOURCES})
-target_link_libraries(ncrok pthread  ${GST_LIBRARIES} ${TAG_LIBRARIES} menuw panelw ncursesw)
+target_link_libraries(ncrok pthread  ${GST_LIBRARIES} ${TAG_LIBRARIES} ${NCURSES_LIBRARIES})
 
 install(TARGETS ncrok
 	RUNTIME DESTINATION bin
